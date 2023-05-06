@@ -41,12 +41,13 @@
 
 
 (defn do-read [url op]
-  (let [result false 
-              ;(http/post (str url "/Read") 
-               ;  {:form-params {:foo "foo" :bar "bar"} 
-               ;   :content-type :json
-               ;   :accept :json})
+  (let [result ; false 
+              (http/post url 
+                 {:form-params {:foo "foo" :bar "bar"} 
+                  :content-type :json
+                  :accept :json})
         ]
+    (info result)
     (assoc op :type :ok :value 1337)
   ))
 
@@ -63,17 +64,16 @@
 (defrecord Client [conn]
   client/Client
   (open! [this test node]
-    (assoc this :conn (str  "http://" node ":8080/dev.restate.JepsenService")))
+    (assoc this :conn (str  "http://" node ":8081/dev.restate.JepsenService")))
 
   (setup! [this test])
 
   (invoke! [this test op]
    (case (:f op)
-        :read (do-read (:conn this) op)  
-        :write (do-write (:conn this) op)
-        :cas (do-cas (:conn this) op))
-
-        )
+        :read (do-read (str (:conn this) "/Read") op)  
+        :write (do-write (str (:conn this) "/Write") op)
+        :cas (do-cas (str (:conn this) "/Cas") op)
+        ))
 
   (teardown! [this test])
 
@@ -89,14 +89,13 @@
   (merge tests/noop-test
          {:name "restate"
           :os   debian/os
-          :db   (db "v3.1.5")
+          :db   (db "v0.0.1")
           :pure-generators true
           :client          (Client. nil)
           :generator       (->> (gen/mix [r w cas])
                                 (gen/stagger 1)
                                 (gen/nemesis nil)
                                 (gen/time-limit 15))
-          
           }
          opts))
 
