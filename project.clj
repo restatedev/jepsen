@@ -7,5 +7,6 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [jepsen "0.3.2"]
                  [verschlimmbesserung "0.1.3"]
+                 [clj-http "3.12.3"]
                  ]
   :repl-options {:init-ns jepsen.restate})
