@@ -1,4 +1,6 @@
+vagrant/gh_token.json
 /target
+store
 /classes
 /checkouts
 profiles.clj
