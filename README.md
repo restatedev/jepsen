@@ -8,7 +8,7 @@ A Clojure library designed to ... well, that part is up to you.
 * JVM
 * Vagrant
 * Just
-
+* A valid access token for Github - place that in `vagrant/gh_token.json`
 
 ## VM management using Vagrant 
 
