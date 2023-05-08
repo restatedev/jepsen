@@ -6,6 +6,8 @@ pkgs.mkShell rec {
 	vagrant
     	just
 	gnuplot
+
+	nodejs # for the service
     ];
 }
 
