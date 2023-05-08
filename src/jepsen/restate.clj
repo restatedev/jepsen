@@ -1,98 +1,32 @@
 (ns jepsen.restate
   (:require [clojure.tools.logging :refer :all]
-            [clojure.string :as str]
             [jepsen [cli :as cli]
-             [control :as c]
-             [db :as db]
-             [client :as client]
+             [checker :as checker]
              [generator :as gen]
              [tests :as tests]]
-            [jepsen.control.util :as cu]
+            [knossos.model :as model]
             [jepsen.os.debian :as debian]
-            [clj-http.client :as http]
+
+            [jepsen.restate-cluster :as cluster]
+            [jepsen.restate-client :as client]
             )
+  (:gen-class)
   )
-
-
- 
-(defn db
-  "Restate for a particular version."
-  [version]
-  (reify db/DB
-    (setup! [_ test node]
-      (info node "installing restate" version)
-      (c/su
-        (c/exec :systemctl :restart :docker)
-        (c/exec :docker :pull "ghcr.io/restatedev/restate:latest")
-        (c/exec :docker :run :-itd :--rm :-p "8081:8081" :-p "9090:9090" "ghcr.io/restatedev/restate:latest"))
-      )
-
-    (teardown! [_ test node]
-      (info node "tearing down restate")
-      (c/su
-        (c/exec :docker :ps :-aq :| :xargs :docker :stop :|| true))
-      )
-    ))
-
-
-(defn r   [_ _] {:type :invoke, :f :read, :value nil})
-(defn w   [_ _] {:type :invoke, :f :write, :value (rand-int 5)})
-(defn cas [_ _] {:type :invoke, :f :cas, :value [(rand-int 5) (rand-int 5)]})
-
-
-(defn do-read [url op]
-  (let [result ; false 
-              (http/post url 
-                 {:form-params {:foo "foo" :bar "bar"} 
-                  :content-type :json
-                  :accept :json})
-        ]
-    (info result)
-    (assoc op :type :ok :value 1337)
-  ))
-
-(defn do-write [url op]
-  (assoc op :type :ok)
-  )
-
-
-(defn do-cas [url op]
-  (assoc op :type :ok)
-  )
-
-
-(defrecord Client [conn]
-  client/Client
-  (open! [this test node]
-    (assoc this :conn (str  "http://" node ":8081/dev.restate.JepsenService")))
-
-  (setup! [this test])
-
-  (invoke! [this test op]
-   (case (:f op)
-        :read (do-read (str (:conn this) "/Read") op)  
-        :write (do-write (str (:conn this) "/Write") op)
-        :cas (do-cas (str (:conn this) "/Cas") op)
-        ))
-
-  (teardown! [this test])
-
-  (close! [_ test]
-    ; If our connection were stateful, we'd close it here.
-    ))
-
 
 (defn restate-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
   :concurrency, ...), constructs a test map."
   [opts]
   (merge tests/noop-test
-         {:name "restate"
-          :os   debian/os
-          :db   (db "v0.0.1")
+         {:name            "restate"
+          :os              debian/os
+          :db              (cluster/make-cluster "v0.0.1")
           :pure-generators true
-          :client          (Client. nil)
-          :generator       (->> (gen/mix [r w cas])
+          :client          (client/make-client)
+          :checker         (checker/linearizable
+                             {:model     (model/cas-register)
+                              :algorithm :linear})
+          :generator       (->> (gen/mix jepsen.ops/all)
                                 (gen/stagger 1)
                                 (gen/nemesis nil)
                                 (gen/time-limit 15))
