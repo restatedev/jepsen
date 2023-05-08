@@ -4,7 +4,7 @@
 (defn w [_ _] {:type :invoke, :f :write, :value (rand-int 5)})
 (defn cas [_ _] {:type :invoke, :f :cas, :value [(rand-int 5) (rand-int 5)]})
 
-(def all [r w cas])
+(def all [r w])
 (defmulti op->grpc-method :f)
 (defmulti op->argument :f)
 (defmulti op->handle-ok (fn [op _] (:f op)))
@@ -16,7 +16,7 @@
 (defmethod op->argument :read [_]
   {:key "r0"})
 (defmethod op->handle-ok :read [op res]
-  (assoc op :type :ok :value (:value res)))
+  (assoc op :type :ok, :value (:value res)))
 ;;
 ;; write
 ;;

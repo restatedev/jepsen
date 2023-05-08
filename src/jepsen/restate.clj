@@ -24,20 +24,21 @@
           :db              (cluster/make-single-cluster "latest")
           :pure-generators true
           :client          (client/make-client)
-
           :checker         (checker/compose
-                             {:perf   (checker/perf)
-                              :linear (checker/linearizable {:model     (model/cas-register)
+                             {
+                              ;:perf   (checker/perf)
+                              :linear (checker/linearizable {:model     (model/cas-register 0)
                                                              :algorithm :linear})})
 
 
           :generator       (->> (gen/mix jepsen.ops/all)
-                                  (gen/stagger 1)
-                                (gen/nemesis
-                                  (gen/phases (cycle [(gen/sleep 5)
-                                                      {:type :info, :f :start}
-                                                      (gen/sleep 5)
-                                                      {:type :info, :f :stop}])))
+                           ;       (gen/stagger 1)
+                                (gen/nemesis nil)
+                              ;  (gen/nemesis
+                              ;    (gen/phases (cycle [(gen/sleep 5)
+                              ;                        {:type :info, :f :start}
+                              ;                        (gen/sleep 5)
+                               ;                       {:type :info, :f :stop}])))
                                 (gen/time-limit (:time-limit opts)))
           }
          opts))

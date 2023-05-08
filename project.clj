@@ -5,7 +5,7 @@
             :url  "https://www.eclipse.org/legal/epl-2.0/"}
   :main jepsen.restate
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [jepsen "0.3.2"]
+                 [jepsen "0.3.1"]
                  [verschlimmbesserung "0.1.3"]
                  [org.clojure/data.json "2.4.0"]
                  ]
