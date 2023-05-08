@@ -1,4 +1,4 @@
-vm command:
+vm *command:
 	#!/usr/bin/env bash
 	cd vagrant
 	vagrant {{command}}

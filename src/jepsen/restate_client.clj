@@ -3,15 +3,14 @@
             [jepsen.http-client :as http]
             [jepsen.ops :as ops]
 
-            [slingshot.slingshot :refer [try+ throw+]]
-
             )
-  (:import (java.net ConnectException)))
+  (:use [slingshot.slingshot :only [throw+ try+]])
+  )
 
 (defrecord RestateClient [baseurl conn]
   client/Client
   (open! [this _ node]
-    (assoc this :baseurl (str  "http://" node ":8081/dev.restate.JepsenService")
+    (assoc this :baseurl (str "http://" node ":8081/dev.restate.JepsenService")
                 :conn (http/make)
                 ))
 
@@ -21,17 +20,17 @@
   (invoke! [this _ op]
     (let [baseurl (:baseurl this)
           client (:conn this)
-          url    (str baseurl (ops/op->grpc-method op))
+          url (str baseurl (ops/op->grpc-method op))
           request (ops/op->argument op)
           ]
-      (try
+      (try+
         (let [{:keys [success body status]} (http/post client url request)]
           (if (not success)
             (assoc op :type :fail :error status)
             (ops/op->handle-ok op body)))
-        (catch ConnectException ex
+        (catch [:exception :connection] _
           (assoc op :type :fail :error :connection)
-        ))))
+          ))))
 
   (teardown! [this _]
     this)

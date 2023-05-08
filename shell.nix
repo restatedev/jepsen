@@ -5,6 +5,7 @@ pkgs.mkShell rec {
 	leiningen
 	vagrant
     	just
+	gnuplot
     ];
 }
 

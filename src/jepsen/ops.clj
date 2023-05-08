@@ -16,7 +16,7 @@
 (defmethod op->argument :read [_]
   {:key "r0"})
 (defmethod op->handle-ok :read [op res]
-            (assoc op :type :ok :value (:value res)))
+  (assoc op :type :ok :value (:value res)))
 ;;
 ;; write
 ;;
@@ -25,7 +25,7 @@
 (defmethod op->argument :write [op]
   {:key "r0" :value (:value op)})
 (defmethod op->handle-ok :write [op _]
-      (assoc op :type :ok))
+  (assoc op :type :ok))
 
 
 ;;

@@ -1,7 +1,10 @@
 (ns jepsen.http-client
   (:require [clojure.data.json :as json])
-  (:import [java.net.http HttpClient HttpRequest HttpClient$Version HttpRequest$BodyPublishers HttpResponse HttpResponse$BodyHandlers]
-           [java.net URI]))
+  (:use [slingshot.slingshot :only [throw+ try+]])
+
+  (:import (java.net ConnectException URI)
+           (java.net.http HttpClient HttpClient$Version HttpRequest HttpRequest$BodyPublishers HttpResponse HttpResponse$BodyHandlers))
+  )
 
 
 (defn make
@@ -18,10 +21,11 @@
             (.header "Accept" "application/json")
             (.header "Content-Type" "application/json")
             (.POST (HttpRequest$BodyPublishers/ofString request-body))
-            (.build))
-        response (^HttpResponse .send client request (HttpResponse$BodyHandlers/ofString))
-        ]
-    (if (not (= (.statusCode response) 200))
-      {:success false :status (.statusCode response) :body nil}
-      {:success true :status 200 :body (json/read-str (.body response))}))
-  )
+            (.build))]
+    (try+
+      (let [response (^HttpResponse .send client request (HttpResponse$BodyHandlers/ofString))]
+        (if (not (= (.statusCode response) 200))
+          {:success false :status (.statusCode response) :body nil}
+          {:success true :status 200 :body (json/read-str (.body response))}))
+      (catch ConnectException _
+        (throw+ {:success false :status nil :body nil :exception :connection})))))

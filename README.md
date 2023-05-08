@@ -8,14 +8,14 @@ A Clojure library designed to ... well, that part is up to you.
 * JVM
 * Vagrant
 * Just
+* gnuplot
 * A valid access token for Github - place that in `vagrant/gh_token.json`
 
 ## VM management using Vagrant 
 
-* To start 5 machines, named n1, n2, n3, n4, n5
-
+* At the first time startign the VM you need to provison them (install and auth Docker)
 ```bash
-just vm up 
+just vm up --provision
 ```
 
 * Check their status
@@ -25,9 +25,18 @@ just vm status
 ```
 
 * To stop them
+
 ```bash
 just vm halt
 ```
+
+* After the first time, to start the VMs use:
+
+```bash
+just vm up 
+```
+
+
 
 * If you would like to ssh to an individual machine, for example n1 use: 
 ```bash

@@ -1,15 +1,16 @@
 (ns jepsen.restate
   (:require [clojure.tools.logging :refer :all]
-            [jepsen [cli :as cli]
-             [checker :as checker]
-             [generator :as gen]
-             [tests :as tests]]
-            [knossos.model :as model]
+            (jepsen [checker :as checker]
+                    [cli :as cli]
+                    [generator :as gen]
+                    [tests :as tests])
             [jepsen.os.debian :as debian]
+            [jepsen.restate-client :as client]
 
             [jepsen.restate-cluster :as cluster]
-            [jepsen.restate-client :as client]
+            [knossos.model :as model]
             )
+  (:use [slingshot.slingshot :only [throw+ try+]])
   (:gen-class)
   )
 
@@ -23,9 +24,12 @@
           :db              (cluster/make-cluster "v0.0.1")
           :pure-generators true
           :client          (client/make-client)
-          :checker         (checker/linearizable
-                             {:model     (model/cas-register)
-                              :algorithm :linear})
+
+          :checker         (checker/compose
+                             {:perf   (checker/perf)
+                              :linear (checker/linearizable {:model     (model/cas-register)
+                                                             :algorithm :linear})})
+
           :generator       (->> (gen/mix jepsen.ops/all)
                                 (gen/stagger 1)
                                 (gen/nemesis nil)
