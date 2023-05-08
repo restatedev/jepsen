@@ -32,7 +32,7 @@
 
 
           :generator       (->> (gen/mix jepsen.ops/all)
-                                ;  (gen/stagger 1)
+                                  (gen/stagger 1)
                                 (gen/nemesis
                                   (gen/phases (cycle [(gen/sleep 5)
                                                       {:type :info, :f :start}

@@ -7,17 +7,28 @@
   (:use [slingshot.slingshot :only [throw+ try+]])
   )
 
-(defrecord RestateClient [baseurl conn]
+(defrecord RestateClient [baseurl conn am-i-restate? restate-node]
   client/Client
-  (open! [this test _]
+  (open! [this test node]
     (let [restate-node (-> test :nodes first)
-          baseurl (str "http://" restate-node ":8081/dev.restate.JepsenService")
+          baseurl (str "http://" restate-node ":9090/org.example.JepsenService")
           ]
       (info "New client talking to " restate-node)
       (assoc this :baseurl baseurl
-                  :conn (http/make))))
+                  :conn (http/make)
+                  :am-i-restate? (= node restate-node)
+                  :restate-node restate-node
+                  )))
 
   (setup! [this _]
+    (when (:am-i-restate? this)
+        ;;; we need to do discovery
+        (info "Starting auto discovery")
+        (info "Discovery"
+          (http/post (:conn this)
+                      (str "http://" (:restate-node this) ":8081/endpoint/discover") ; <-- meta
+                      {:uri (str "http://" (:restate-node this) ":8000")} ; <-- envoy
+                     )))
     this)
 
   (invoke! [this _ op]
@@ -43,6 +54,6 @@
     ))
 
 (defn make-client []
-  (RestateClient. nil nil))
+  (RestateClient. nil nil nil nil))
 
 
