@@ -1,18 +1,21 @@
 (ns jepsen.restate-client
-  (:require [jepsen.client :as client]
+  (:require [clojure.tools.logging :refer :all]
+            [jepsen.client :as client]
             [jepsen.http-client :as http]
             [jepsen.ops :as ops]
-
             )
   (:use [slingshot.slingshot :only [throw+ try+]])
   )
 
 (defrecord RestateClient [baseurl conn]
   client/Client
-  (open! [this _ node]
-    (assoc this :baseurl (str "http://" node ":8081/dev.restate.JepsenService")
-                :conn (http/make)
-                ))
+  (open! [this test _]
+    (let [restate-node (-> test :nodes first)
+          baseurl (str "http://" restate-node ":8081/dev.restate.JepsenService")
+          ]
+      (info "New client talking to " restate-node)
+      (assoc this :baseurl baseurl
+                  :conn (http/make))))
 
   (setup! [this _]
     this)

@@ -11,9 +11,10 @@ A Clojure library designed to ... well, that part is up to you.
 * gnuplot
 * A valid access token for Github - place that in `vagrant/gh_token.json`
 
-## VM management using Vagrant 
+## VM management using Vagrant
 
 * At the first time startign the VM you need to provison them (install and auth Docker)
+
 ```bash
 just vm up --provision
 ```
@@ -36,13 +37,11 @@ just vm halt
 just vm up 
 ```
 
+* If you would like to ssh to an individual machine, for example n1 use:
 
-
-* If you would like to ssh to an individual machine, for example n1 use: 
 ```bash
 just ssh n1
 ```
-
 
 ## Run
 
@@ -58,7 +57,7 @@ just vm-status
 just test
 ```
 
-You should see: 
+You should see:
 
 ```
 Everything looks good! ヽ(‘ー`)ノ

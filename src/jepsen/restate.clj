@@ -21,7 +21,7 @@
   (merge tests/noop-test
          {:name            "restate"
           :os              debian/os
-          :db              (cluster/make-cluster "v0.0.1")
+          :db              (cluster/make-single-cluster "latest")
           :pure-generators true
           :client          (client/make-client)
 
@@ -30,10 +30,15 @@
                               :linear (checker/linearizable {:model     (model/cas-register)
                                                              :algorithm :linear})})
 
+
           :generator       (->> (gen/mix jepsen.ops/all)
-                                (gen/stagger 1)
-                                (gen/nemesis nil)
-                                (gen/time-limit 15))
+                                ;  (gen/stagger 1)
+                                (gen/nemesis
+                                  (gen/phases (cycle [(gen/sleep 5)
+                                                      {:type :info, :f :start}
+                                                      (gen/sleep 5)
+                                                      {:type :info, :f :stop}])))
+                                (gen/time-limit (:time-limit opts)))
           }
          opts))
 
