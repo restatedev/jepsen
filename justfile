@@ -18,7 +18,7 @@ make-service:
 
 test *flags:
 	#!/usr/bin/env bash
-	lein run -- test {{flags}} \
+	lein run -- test --concurrency 100 {{flags}} \
 	     --nodes-file ./vagrant/nodes.txt \
 	     --ssh-private-key ./vagrant/vagrant_key \
 	     --username vagrant \
