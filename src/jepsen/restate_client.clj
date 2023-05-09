@@ -43,7 +43,7 @@
             (assoc op :type :fail :error status)
             (ops/op->handle-ok op body)))
         (catch Throwable _
-               (assoc op :type :fail :error :io)))))
+          (assoc op :type :fail :error :io)))))
 
   (teardown! [this _]
     this)
