@@ -26,19 +26,20 @@
           :client          (client/make-client)
           :checker         (checker/compose
                              {
-                              ;:perf   (checker/perf)
+                              :perf   (checker/perf)
                               :linear (checker/linearizable {:model     (model/cas-register 0)
                                                              :algorithm :linear})})
 
-
           :generator       (->> (gen/mix jepsen.ops/all)
-                           ;       (gen/stagger 1)
+                                ;  uncomment the following line to slow down the test
+                                ;       (gen/stagger 1)
                                 (gen/nemesis nil)
-                              ;  (gen/nemesis
-                              ;    (gen/phases (cycle [(gen/sleep 5)
-                              ;                        {:type :info, :f :start}
-                              ;                        (gen/sleep 5)
-                               ;                       {:type :info, :f :stop}])))
+                                ; uncomment to introduce faults
+                                ;  (gen/nemesis
+                                ;    (gen/phases (cycle [(gen/sleep 5)
+                                ;                        {:type :info, :f :start}
+                                ;                        (gen/sleep 5)
+                                ;                       {:type :info, :f :stop}])))
                                 (gen/time-limit (:time-limit opts)))
           }
          opts))

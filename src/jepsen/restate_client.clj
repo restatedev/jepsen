@@ -22,13 +22,13 @@
 
   (setup! [this _]
     (when (:am-i-restate? this)
-        ;;; we need to do discovery
-        (info "Starting auto discovery")
-        (info "Discovery"
-          (http/post (:conn this)
-                      (str "http://" (:restate-node this) ":8081/endpoint/discover") ; <-- meta
-                      {:uri (str "http://" (:restate-node this) ":8000")} ; <-- envoy
-                     )))
+      ;;; we need to do discovery
+      (info "Starting auto discovery")
+      (info "Discovery"
+            (http/post (:conn this)
+                       (str "http://" (:restate-node this) ":8081/endpoint/discover") ; <-- meta
+                       {:uri (str "http://" (:restate-node this) ":8000")} ; <-- envoy
+                       )))
     this)
 
   (invoke! [this _ op]

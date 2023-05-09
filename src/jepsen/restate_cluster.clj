@@ -11,7 +11,7 @@
   [tag]
   (reify jepsen.db/DB
     (setup! [_ test node]
-      (let [restate-img (str "ghcr.io/restatedev/restate-jem:" tag)
+      (let [restate-img (str "ghcr.io/restatedev/restate:" tag)
             service-img (str "ghcr.io/restatedev/jepsen:latest")
             ;envoy-conf (create-envoy-conf (-> test :nodes rest))
             ]
@@ -55,4 +55,4 @@
       (c/su
         (c/exec :docker :ps :-aq :| :xargs :docker :stop :|| true)
         (c/exec :rm :-f "/envoy.yaml")
-      ))))
+        ))))
