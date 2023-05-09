@@ -33,6 +33,7 @@
                                                                :algorithm :linear})
                               :timeline (timeline/html)
                               })
+          :nemesis         (cluster/container-killer)
           :generator       (->> (gen/mix jepsen.ops/all)
                                 (gen/nemesis
                                   (gen/phases (cycle [(gen/sleep 5)

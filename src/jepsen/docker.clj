@@ -21,7 +21,7 @@
 (defn stop-container
   [label]
   (c/su
-    (c/exec :docker :ps :-aq :--filter (str "label=component=" label) :| :xargs :docker :kill :|| :true)))
+    (c/exec :docker :ps :-aq :--filter (c/escape (str "label=component=" label)) :| :xargs :docker :kill :|| :true)))
 
 
 (defn stop-all

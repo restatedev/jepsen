@@ -37,14 +37,13 @@
           url (str baseurl (ops/op->grpc-method op))
           request (ops/op->argument op)
           ]
-      (try+
+      (try
         (let [{:keys [success body status]} (http/post client url request)]
           (if (not success)
             (assoc op :type :fail :error status)
             (ops/op->handle-ok op body)))
-        (catch [:exception :connection] _
-          (assoc op :type :fail :error :connection)
-          ))))
+        (catch Throwable _
+               (assoc op :type :fail :error :io)))))
 
   (teardown! [this _]
     this)

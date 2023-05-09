@@ -77,7 +77,7 @@
           (c/su
             (c/exec :systemctl :restart :docker)
             (c/exec :docker :pull service-image)
-            (c/exec :docker :run :-itd :--rm :-p "8000:8000" service-image)
+            (start-service-endpoint)
             ))))
 
     (teardown! [_ _ node]
