@@ -14,7 +14,7 @@ export class MyExampleService implements JepsenService {
 
 	async read(request: ReadRequest): Promise<ReadResponse> {
 		const ctx = restate.useContext(this);
-		const value = (await ctx.get<number>(COUNTER_KEY)) || 0;
+		const value = (await ctx.get<number>("value")) || 0;
 		return ReadResponse.create({value: value});
 	}
 
