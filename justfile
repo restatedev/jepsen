@@ -9,6 +9,13 @@ ssh node:
 	vagrant ssh {{node}}
 
 
+make-service:
+	#!/usr/bin/env bash
+	cd service
+	docker build . -t jepsen
+	cd ..
+
+
 test *flags:
 	#!/usr/bin/env bash
 	lein run -- test {{flags}} \
