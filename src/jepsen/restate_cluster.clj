@@ -1,24 +1,17 @@
 (ns jepsen.restate-cluster
   (:require
     [clojure.tools.logging :refer :all]
-    [jepsen.control :as c]))
+    [jepsen.control :as c]
+    [jepsen.db]
+    ))
 
-
-(defn create-envoy-conf [nodes]
-  (let [node-str (->> nodes
-                      (map (fn [node]
-                             (str "server " node ":8000;")))
-                      (clojure.string/join "\n"))
-        ]
-    ;;; TODO: actually template in the nodes, as this is too difficult atm
-    (slurp "envoy.yaml")))
 
 (defn make-single-cluster
   "Restate for a particular version."
   [tag]
   (reify jepsen.db/DB
     (setup! [_ test node]
-      (let [restate-img (str "ghcr.io/restatedev/restate:" tag)
+      (let [restate-img (str "ghcr.io/restatedev/restate-jem:" tag)
             service-img (str "ghcr.io/restatedev/jepsen:latest")
             ;envoy-conf (create-envoy-conf (-> test :nodes rest))
             ]
@@ -27,7 +20,7 @@
             ;;; n1 will have restate
             (info node "installing restate" tag)
             (c/su
-              ;; not sure what's the problem with debain+vagrant, but this is needed and it is getting too late
+              ;; not sure what's the problem with debain+vagrant, but this is needed, and it is getting too late
               ;; to figure it out.
               (c/exec :systemctl :restart :docker)
               ;;
@@ -40,9 +33,7 @@
               ;; setup envoy as a side-car load balancer
               ;;
               (info node "starting envoy")
-              (c/upload-resource! "envoy.yaml" "/envoy.yaml")
-              ;(spit "/tmp/envoy.yaml" envoy-conf)
-              ;(c/upload "/tmp/envoy.yaml" "/envoy.yaml")
+              (c/upload-resource! "envoy.yaml" "/envoy.yaml") ;;; TODO: template the nodes into envoy configuration
               (info (c/exec :docker :run :-itd :--rm
                             :-p "8000:8000"
                             :-v "/envoy.yaml:/config/envoy.yaml:ro"
@@ -63,5 +54,5 @@
       (info node "tearing down")
       (c/su
         (c/exec :docker :ps :-aq :| :xargs :docker :stop :|| true)
-        ;(c/exec :rm :-f "/nginx.conf")
+        (c/exec :rm :-f "/envoy.yaml")
       ))))
