@@ -14,33 +14,33 @@
   (:gen-class)
   )
 
+
 (defn restate-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
   :concurrency, ...), constructs a test map."
   [opts]
   (merge tests/noop-test
-         :name "restate"
-         :os debian/os
-         :db (cluster/make-single-cluster {:restate-image "ghcr.io/restatedev/restate:latest"
-                                           :service-image "ghcr.io/restatedev/jepsen:latest"
-                                           })
-         :pure-generators true
-         :client (client/make-client)
-         :checker (checker/compose
-                    {
-                     :perf     (checker/perf)
-                     :linear   (checker/linearizable {:model     (model/cas-register 0)
-                                                      :algorithm :linear})
-                     :timeline (timeline/html)
-                     })
-         :generator (->> (gen/mix jepsen.ops/all)
-                         (gen/nemesis
-                           (gen/phases (cycle [(gen/sleep 5)
-                                               {:type :info, :f :start}
-                                               (gen/sleep 5)
-                                               {:type :info, :f :stop}])))
-                         (gen/time-limit (:time-limit opts)))
-
+         {
+          :name            "restate"
+          :os              debian/os
+          :db              (cluster/make-single-cluster)
+          :pure-generators true
+          :client          (client/make-client)
+          :checker         (checker/compose
+                             {
+                              :perf     (checker/perf)
+                              :linear   (checker/linearizable {:model     (model/cas-register 0)
+                                                               :algorithm :linear})
+                              :timeline (timeline/html)
+                              })
+          :generator       (->> (gen/mix jepsen.ops/all)
+                                (gen/nemesis
+                                  (gen/phases (cycle [(gen/sleep 5)
+                                                      {:type :info, :f :start}
+                                                      (gen/sleep 5)
+                                                      {:type :info, :f :stop}])))
+                                (gen/time-limit (:time-limit opts)))
+          }
          opts))
 
 (defn -main
