@@ -8,7 +8,7 @@
                       (into []))
 
         mount-str (->> mount
-                       (mapcat (fn [[local remote]] ["-v" (str local ":" remote ":ro")]))
+                       (mapcat (fn [[local remote]] ["-v" (str local ":" remote)]))
                        (into []))
 
         arg-str (->> args
@@ -17,6 +17,14 @@
         ]
     (c/su
       (c/exec :docker :run :--label (str "component=" label) :-itd :--rm port-str mount-str image arg-str))))
+
+(defn create-volume [name]
+  (c/su
+    (c/exec :docker :volume :create name)))
+
+(defn delete-volume [name]
+  (c/su
+    (c/exec :docker :volume :rm :-f name)))
 
 (defn stop-container
   [label]

@@ -12,11 +12,14 @@
 (def service-image "ghcr.io/restatedev/jepsen:latest")
 (def restate-image "ghcr.io/restatedev/restate:latest")
 
+(def restate-volume "restate")
+
 (defn start-restate []
   (docker/start-container {
                            :label "restate"
                            :image restate-image
                            :ports [8081 9090]
+                           :mount [[restate-volume "/target"]]
                            }))
 
 (defn stop-restate []
@@ -57,6 +60,10 @@
             ;; to figure it out.
             (c/exec :systemctl :restart :docker)
             ;;
+            ;; create restate volume
+            ;;
+            (docker/create-volume restate-volume)
+            ;;
             ;; setup restate
             ;;
             (c/exec :docker :pull restate-image)
@@ -84,6 +91,7 @@
       (info node "tearing down")
       (c/su
         (c/exec :docker :ps :-aq :| :xargs :docker :stop :|| true) ;; basically kill all docker
+        (docker/delete-volume restate-volume)
         (c/exec :rm :-f "/envoy.yaml")
         ))))
 
