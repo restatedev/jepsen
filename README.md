@@ -2,7 +2,7 @@
 
 A Clojure library designed to ... well, that part is up to you.
 
-## Requirnments
+## Requirements
 
 * Clojure
 * JVM
@@ -11,9 +11,21 @@ A Clojure library designed to ... well, that part is up to you.
 * gnuplot
 * A valid access token for Github - place that in `vagrant/gh_token.json`
 
+## Building and publish the service
+
+* Goto `service/` directory
+* Build the `Docker` image
+* Push the image to our private container registry
+
+```bash
+docker images # select the jepsen service image id
+docker tag $theimageid ghcr.io/restatedev/jepsen:latest
+docker push ghcr.io/restatedev/jepsen:latest
+```
+
 ## VM management using Vagrant
 
-* At the first time startign the VM you need to provison them (install and auth Docker)
+* At the first time starting the VM you need to provison them (install and auth Docker)
 
 ```bash
 just vm up --provision
