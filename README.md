@@ -60,7 +60,7 @@ just ssh n1
 * make sure that the VMs are running
 
 ```bash
-just vm-status
+just vm status
 ```
 
 * run the test
