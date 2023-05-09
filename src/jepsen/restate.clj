@@ -8,6 +8,7 @@
             [jepsen.os.debian :as debian]
             [jepsen.restate-client :as client]
             [jepsen.restate-cluster :as cluster]
+            [jepsen.independent :as independent]
             [knossos.model :as model]
             )
   (:use [slingshot.slingshot :only [throw+ try+]])
@@ -26,21 +27,29 @@
           :db              (cluster/make-single-cluster)
           :pure-generators true
           :client          (client/make-client)
-          :checker         (checker/compose
-                             {
-                              :perf     (checker/perf)
-                              :linear   (checker/linearizable {:model     (model/cas-register 0)
-                                                               :algorithm :linear})
-                              :timeline (timeline/html)
-                              })
-          :nemesis         (cluster/container-killer)
-          :generator       (->> (gen/mix jepsen.ops/all)
-                                (gen/nemesis
-                                  (gen/phases (cycle [(gen/sleep 5)
-                                                      {:type :info, :f :start}
-                                                      (gen/sleep 5)
-                                                      {:type :info, :f :stop}])))
-                                (gen/time-limit (:time-limit opts)))
+
+          :checker   (checker/compose
+                       {:perf  (checker/perf)
+                        :indep (independent/checker
+                                 (checker/compose
+                                   {:linear   (checker/linearizable {:model (model/cas-register 0)
+                                                                     :algorithm :linear})
+                                    :timeline (timeline/html)}))})
+
+       ;   :nemesis         (cluster/container-killer)
+          :generator  (->> (independent/concurrent-generator
+                                               10
+                                               (rest (range)) ; use key values greater than 0
+                                               (fn [_]
+                                                 (->> (gen/mix jepsen.ops/all)
+                                                      (gen/stagger 1/50)
+                                                      (gen/limit 100))))
+                                             (gen/nemesis
+                                               (cycle [(gen/sleep 5)
+                                                       {:type :info, :f :start}
+                                                       (gen/sleep 5)
+                                                       {:type :info, :f :stop}]))
+                                             (gen/time-limit (:time-limit opts)))
           }
          opts))
 

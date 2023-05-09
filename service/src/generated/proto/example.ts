@@ -6,7 +6,7 @@ import { protoMetadata as protoMetadata1 } from "./dev/restate/ext";
 export const protobufPackage = "org.example";
 
 export interface ReadRequest {
-  key: string;
+  key: number;
 }
 
 export interface ReadResponse {
@@ -14,7 +14,7 @@ export interface ReadResponse {
 }
 
 export interface WriteRequest {
-  key: string;
+  key: number;
   value: number;
 }
 
@@ -22,7 +22,7 @@ export interface WriteResponse {
 }
 
 export interface CasRequest {
-  key: string;
+  key: number;
   compare: number;
   exchange: number;
 }
@@ -32,13 +32,13 @@ export interface CasResponse {
 }
 
 function createBaseReadRequest(): ReadRequest {
-  return { key: "" };
+  return { key: 0 };
 }
 
 export const ReadRequest = {
   encode(message: ReadRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
+    if (message.key !== 0) {
+      writer.uint32(8).int32(message.key);
     }
     return writer;
   },
@@ -51,11 +51,11 @@ export const ReadRequest = {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1:
-          if (tag != 10) {
+          if (tag != 8) {
             break;
           }
 
-          message.key = reader.string();
+          message.key = reader.int32();
           continue;
       }
       if ((tag & 7) == 4 || tag == 0) {
@@ -67,12 +67,12 @@ export const ReadRequest = {
   },
 
   fromJSON(object: any): ReadRequest {
-    return { key: isSet(object.key) ? String(object.key) : "" };
+    return { key: isSet(object.key) ? Number(object.key) : 0 };
   },
 
   toJSON(message: ReadRequest): unknown {
     const obj: any = {};
-    message.key !== undefined && (obj.key = message.key);
+    message.key !== undefined && (obj.key = Math.round(message.key));
     return obj;
   },
 
@@ -82,7 +82,7 @@ export const ReadRequest = {
 
   fromPartial(object: DeepPartial<ReadRequest>): ReadRequest {
     const message = createBaseReadRequest();
-    message.key = object.key ?? "";
+    message.key = object.key ?? 0;
     return message;
   },
 };
@@ -144,13 +144,13 @@ export const ReadResponse = {
 };
 
 function createBaseWriteRequest(): WriteRequest {
-  return { key: "", value: 0 };
+  return { key: 0, value: 0 };
 }
 
 export const WriteRequest = {
   encode(message: WriteRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
+    if (message.key !== 0) {
+      writer.uint32(8).int32(message.key);
     }
     if (message.value !== 0) {
       writer.uint32(16).int32(message.value);
@@ -166,11 +166,11 @@ export const WriteRequest = {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1:
-          if (tag != 10) {
+          if (tag != 8) {
             break;
           }
 
-          message.key = reader.string();
+          message.key = reader.int32();
           continue;
         case 2:
           if (tag != 16) {
@@ -189,12 +189,12 @@ export const WriteRequest = {
   },
 
   fromJSON(object: any): WriteRequest {
-    return { key: isSet(object.key) ? String(object.key) : "", value: isSet(object.value) ? Number(object.value) : 0 };
+    return { key: isSet(object.key) ? Number(object.key) : 0, value: isSet(object.value) ? Number(object.value) : 0 };
   },
 
   toJSON(message: WriteRequest): unknown {
     const obj: any = {};
-    message.key !== undefined && (obj.key = message.key);
+    message.key !== undefined && (obj.key = Math.round(message.key));
     message.value !== undefined && (obj.value = Math.round(message.value));
     return obj;
   },
@@ -205,7 +205,7 @@ export const WriteRequest = {
 
   fromPartial(object: DeepPartial<WriteRequest>): WriteRequest {
     const message = createBaseWriteRequest();
-    message.key = object.key ?? "";
+    message.key = object.key ?? 0;
     message.value = object.value ?? 0;
     return message;
   },
@@ -256,13 +256,13 @@ export const WriteResponse = {
 };
 
 function createBaseCasRequest(): CasRequest {
-  return { key: "", compare: 0, exchange: 0 };
+  return { key: 0, compare: 0, exchange: 0 };
 }
 
 export const CasRequest = {
   encode(message: CasRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
+    if (message.key !== 0) {
+      writer.uint32(8).int32(message.key);
     }
     if (message.compare !== 0) {
       writer.uint32(16).int32(message.compare);
@@ -281,11 +281,11 @@ export const CasRequest = {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1:
-          if (tag != 10) {
+          if (tag != 8) {
             break;
           }
 
-          message.key = reader.string();
+          message.key = reader.int32();
           continue;
         case 2:
           if (tag != 16) {
@@ -312,7 +312,7 @@ export const CasRequest = {
 
   fromJSON(object: any): CasRequest {
     return {
-      key: isSet(object.key) ? String(object.key) : "",
+      key: isSet(object.key) ? Number(object.key) : 0,
       compare: isSet(object.compare) ? Number(object.compare) : 0,
       exchange: isSet(object.exchange) ? Number(object.exchange) : 0,
     };
@@ -320,7 +320,7 @@ export const CasRequest = {
 
   toJSON(message: CasRequest): unknown {
     const obj: any = {};
-    message.key !== undefined && (obj.key = message.key);
+    message.key !== undefined && (obj.key = Math.round(message.key));
     message.compare !== undefined && (obj.compare = Math.round(message.compare));
     message.exchange !== undefined && (obj.exchange = Math.round(message.exchange));
     return obj;
@@ -332,7 +332,7 @@ export const CasRequest = {
 
   fromPartial(object: DeepPartial<CasRequest>): CasRequest {
     const message = createBaseCasRequest();
-    message.key = object.key ?? "";
+    message.key = object.key ?? 0;
     message.compare = object.compare ?? 0;
     message.exchange = object.exchange ?? 0;
     return message;
@@ -468,7 +468,7 @@ export const protoMetadata: ProtoMetadata = {
         "name": "key",
         "number": 1,
         "label": 1,
-        "type": 9,
+        "type": 5,
         "typeName": "",
         "extendee": "",
         "defaultValue": "",
@@ -522,7 +522,7 @@ export const protoMetadata: ProtoMetadata = {
         "name": "key",
         "number": 1,
         "label": 1,
-        "type": 9,
+        "type": 5,
         "typeName": "",
         "extendee": "",
         "defaultValue": "",
@@ -576,7 +576,7 @@ export const protoMetadata: ProtoMetadata = {
         "name": "key",
         "number": 1,
         "label": 1,
-        "type": 9,
+        "type": 5,
         "typeName": "",
         "extendee": "",
         "defaultValue": "",

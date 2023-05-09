@@ -16,7 +16,7 @@ service JepsenService {
 }
 
 message ReadRequest {
-	string key = 1 [(dev.restate.ext.field) = KEY];
+	int32 key = 1 [(dev.restate.ext.field) = KEY];
 }
 
 message ReadResponse {
@@ -25,7 +25,7 @@ message ReadResponse {
 
 
 message WriteRequest {
-	string key = 1 [(dev.restate.ext.field) = KEY];
+	int32 key = 1 [(dev.restate.ext.field) = KEY];
 	int32 value = 2;
 }
 
@@ -34,7 +34,7 @@ message WriteResponse {
 }
 
 message CasRequest {
-	string key = 1 [(dev.restate.ext.field) = KEY];
+	int32 key = 1 [(dev.restate.ext.field) = KEY];
 	int32 compare = 2;
 	int32 exchange = 3;
 }

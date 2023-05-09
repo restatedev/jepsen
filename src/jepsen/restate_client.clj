@@ -35,8 +35,7 @@
     (let [baseurl (:baseurl this)
           client (:conn this)
           url (str baseurl (ops/op->grpc-method op))
-          request (ops/op->argument op)
-          ]
+          request (ops/op->request op)]
       (try
         (let [{:keys [success body status]} (http/post client url request)]
           (if (not success)
