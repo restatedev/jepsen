@@ -21,6 +21,16 @@ export interface WriteRequest {
 export interface WriteResponse {
 }
 
+export interface CasRequest {
+  key: string;
+  compare: number;
+  exchange: number;
+}
+
+export interface CasResponse {
+  success: boolean;
+}
+
 function createBaseReadRequest(): ReadRequest {
   return { key: "" };
 }
@@ -245,9 +255,150 @@ export const WriteResponse = {
   },
 };
 
+function createBaseCasRequest(): CasRequest {
+  return { key: "", compare: 0, exchange: 0 };
+}
+
+export const CasRequest = {
+  encode(message: CasRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.compare !== 0) {
+      writer.uint32(16).int32(message.compare);
+    }
+    if (message.exchange !== 0) {
+      writer.uint32(24).int32(message.exchange);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CasRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCasRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag != 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag != 16) {
+            break;
+          }
+
+          message.compare = reader.int32();
+          continue;
+        case 3:
+          if (tag != 24) {
+            break;
+          }
+
+          message.exchange = reader.int32();
+          continue;
+      }
+      if ((tag & 7) == 4 || tag == 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CasRequest {
+    return {
+      key: isSet(object.key) ? String(object.key) : "",
+      compare: isSet(object.compare) ? Number(object.compare) : 0,
+      exchange: isSet(object.exchange) ? Number(object.exchange) : 0,
+    };
+  },
+
+  toJSON(message: CasRequest): unknown {
+    const obj: any = {};
+    message.key !== undefined && (obj.key = message.key);
+    message.compare !== undefined && (obj.compare = Math.round(message.compare));
+    message.exchange !== undefined && (obj.exchange = Math.round(message.exchange));
+    return obj;
+  },
+
+  create(base?: DeepPartial<CasRequest>): CasRequest {
+    return CasRequest.fromPartial(base ?? {});
+  },
+
+  fromPartial(object: DeepPartial<CasRequest>): CasRequest {
+    const message = createBaseCasRequest();
+    message.key = object.key ?? "";
+    message.compare = object.compare ?? 0;
+    message.exchange = object.exchange ?? 0;
+    return message;
+  },
+};
+
+function createBaseCasResponse(): CasResponse {
+  return { success: false };
+}
+
+export const CasResponse = {
+  encode(message: CasResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success === true) {
+      writer.uint32(8).bool(message.success);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CasResponse {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCasResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag != 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+      }
+      if ((tag & 7) == 4 || tag == 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CasResponse {
+    return { success: isSet(object.success) ? Boolean(object.success) : false };
+  },
+
+  toJSON(message: CasResponse): unknown {
+    const obj: any = {};
+    message.success !== undefined && (obj.success = message.success);
+    return obj;
+  },
+
+  create(base?: DeepPartial<CasResponse>): CasResponse {
+    return CasResponse.fromPartial(base ?? {});
+  },
+
+  fromPartial(object: DeepPartial<CasResponse>): CasResponse {
+    const message = createBaseCasResponse();
+    message.success = object.success ?? false;
+    return message;
+  },
+};
+
 export interface JepsenService {
   read(request: ReadRequest): Promise<ReadResponse>;
   write(request: WriteRequest): Promise<WriteResponse>;
+  cas(request: CasRequest): Promise<CasResponse>;
 }
 
 export class JepsenServiceClientImpl implements JepsenService {
@@ -258,6 +409,7 @@ export class JepsenServiceClientImpl implements JepsenService {
     this.rpc = rpc;
     this.read = this.read.bind(this);
     this.write = this.write.bind(this);
+    this.cas = this.cas.bind(this);
   }
   read(request: ReadRequest): Promise<ReadResponse> {
     const data = ReadRequest.encode(request).finish();
@@ -269,6 +421,12 @@ export class JepsenServiceClientImpl implements JepsenService {
     const data = WriteRequest.encode(request).finish();
     const promise = this.rpc.request(this.service, "Write", data);
     return promise.then((data) => WriteResponse.decode(_m0.Reader.create(data)));
+  }
+
+  cas(request: CasRequest): Promise<CasResponse> {
+    const data = CasRequest.encode(request).finish();
+    const promise = this.rpc.request(this.service, "Cas", data);
+    return promise.then((data) => CasResponse.decode(_m0.Reader.create(data)));
   }
 }
 
@@ -412,6 +570,84 @@ export const protoMetadata: ProtoMetadata = {
       "options": undefined,
       "reservedRange": [],
       "reservedName": [],
+    }, {
+      "name": "CasRequest",
+      "field": [{
+        "name": "key",
+        "number": 1,
+        "label": 1,
+        "type": 9,
+        "typeName": "",
+        "extendee": "",
+        "defaultValue": "",
+        "oneofIndex": 0,
+        "jsonName": "key",
+        "options": {
+          "ctype": 0,
+          "packed": false,
+          "jstype": 0,
+          "lazy": false,
+          "deprecated": false,
+          "weak": false,
+          "uninterpretedOption": [],
+        },
+        "proto3Optional": false,
+      }, {
+        "name": "compare",
+        "number": 2,
+        "label": 1,
+        "type": 5,
+        "typeName": "",
+        "extendee": "",
+        "defaultValue": "",
+        "oneofIndex": 0,
+        "jsonName": "compare",
+        "options": undefined,
+        "proto3Optional": false,
+      }, {
+        "name": "exchange",
+        "number": 3,
+        "label": 1,
+        "type": 5,
+        "typeName": "",
+        "extendee": "",
+        "defaultValue": "",
+        "oneofIndex": 0,
+        "jsonName": "exchange",
+        "options": undefined,
+        "proto3Optional": false,
+      }],
+      "extension": [],
+      "nestedType": [],
+      "enumType": [],
+      "extensionRange": [],
+      "oneofDecl": [],
+      "options": undefined,
+      "reservedRange": [],
+      "reservedName": [],
+    }, {
+      "name": "CasResponse",
+      "field": [{
+        "name": "success",
+        "number": 1,
+        "label": 1,
+        "type": 8,
+        "typeName": "",
+        "extendee": "",
+        "defaultValue": "",
+        "oneofIndex": 0,
+        "jsonName": "success",
+        "options": undefined,
+        "proto3Optional": false,
+      }],
+      "extension": [],
+      "nestedType": [],
+      "enumType": [],
+      "extensionRange": [],
+      "oneofDecl": [],
+      "options": undefined,
+      "reservedRange": [],
+      "reservedName": [],
     }],
     "enumType": [],
     "service": [{
@@ -427,6 +663,13 @@ export const protoMetadata: ProtoMetadata = {
         "name": "Write",
         "inputType": ".org.example.WriteRequest",
         "outputType": ".org.example.WriteResponse",
+        "options": { "deprecated": false, "idempotencyLevel": 0, "uninterpretedOption": [] },
+        "clientStreaming": false,
+        "serverStreaming": false,
+      }, {
+        "name": "Cas",
+        "inputType": ".org.example.CasRequest",
+        "outputType": ".org.example.CasResponse",
         "options": { "deprecated": false, "idempotencyLevel": 0, "uninterpretedOption": [] },
         "clientStreaming": false,
         "serverStreaming": false,
@@ -465,6 +708,8 @@ export const protoMetadata: ProtoMetadata = {
     ".org.example.ReadResponse": ReadResponse,
     ".org.example.WriteRequest": WriteRequest,
     ".org.example.WriteResponse": WriteResponse,
+    ".org.example.CasRequest": CasRequest,
+    ".org.example.CasResponse": CasResponse,
     ".org.example.JepsenService": JepsenServiceClientImpl,
   },
   dependencies: [protoMetadata1],
@@ -472,6 +717,7 @@ export const protoMetadata: ProtoMetadata = {
     messages: {
       "ReadRequest": { fields: { "key": { "field": 0 } } },
       "WriteRequest": { fields: { "key": { "field": 0 } } },
+      "CasRequest": { fields: { "key": { "field": 0 } } },
     },
     services: { "JepsenService": { options: { "service_type": 1 }, methods: {} } },
   },

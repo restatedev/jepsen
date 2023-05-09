@@ -4,7 +4,7 @@
 (defn w [_ _] {:type :invoke, :f :write, :value (rand-int 5)})
 (defn cas [_ _] {:type :invoke, :f :cas, :value [(rand-int 5) (rand-int 5)]})
 
-(def all [r w])
+(def all [r w cas])
 (defmulti op->grpc-method :f)
 (defmulti op->argument :f)
 (defmulti op->handle-ok (fn [op _] (:f op)))
@@ -37,7 +37,9 @@
   (let [[compare exchange] (:value op)]
     {:key "r0" :compare compare :exchange exchange}
     ))
-(defmethod op->handle-ok :cas [op _]
-  (assoc op :type :ok))
+(defmethod op->handle-ok :cas [op body]
+  (assoc op :type (if (:success body)
+                    :ok
+                    :fail)))
 
 

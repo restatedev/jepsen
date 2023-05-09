@@ -11,6 +11,8 @@ service JepsenService {
 	rpc Read(ReadRequest) returns (ReadResponse) {};
 
 	rpc Write(WriteRequest) returns (WriteResponse) {};
+
+	rpc Cas(CasRequest) returns (CasResponse) {};
 }
 
 message ReadRequest {
@@ -29,4 +31,14 @@ message WriteRequest {
 
 
 message WriteResponse {
+}
+
+message CasRequest {
+	string key = 1 [(dev.restate.ext.field) = KEY];
+	int32 compare = 2;
+	int32 exchange = 3;
+}
+
+message CasResponse {
+	bool success = 1;
 }
