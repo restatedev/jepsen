@@ -31,13 +31,11 @@
                               :linear (checker/linearizable {:model     (model/cas-register 0)
                                                              :algorithm :linear})})
           :generator       (->> (gen/mix jepsen.ops/all)
-                                (gen/nemesis nil)
-                                ; uncomment to introduce faults
-                                ;  (gen/nemesis
-                                ;    (gen/phases (cycle [(gen/sleep 5)
-                                ;                        {:type :info, :f :start}
-                                ;                        (gen/sleep 5)
-                                ;                       {:type :info, :f :stop}])))
+                                (gen/nemesis
+                                  (gen/phases (cycle [(gen/sleep 5)
+                                                      {:type :info, :f :start}
+                                                      (gen/sleep 5)
+                                                      {:type :info, :f :stop}])))
                                 (gen/time-limit (:time-limit opts)))
           }
          opts))
