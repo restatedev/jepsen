@@ -7,6 +7,12 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.provision :docker
 
+
+  config.vm.provider "libvirt" do |v|
+    v.memory = 4096
+    v.cpus = 2
+  end
+
   # Jepsen can use this key to connect to our nodes
   config.vm.provision "shell" do |s|
     ssh_pub_key = File.readlines("vagrant_key.pub").first.strip
