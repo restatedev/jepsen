@@ -25,7 +25,7 @@
     (try+
       (let [response (^HttpResponse .send client request (HttpResponse$BodyHandlers/ofString))]
         (if (not (= (.statusCode response) 200))
-          {:success false :status (.statusCode response) :body nil :sdf (.body response)}
+          {:success false :status (.statusCode response) :body nil}
           {:success true :status 200 :body (json/read-str (.body response) :key-fn clojure.core/keyword)}))
       (catch ConnectException e
         (.printStackTrace e)
