@@ -8,16 +8,13 @@
 
 (defn make-single-cluster
   "Restate for a particular version."
-  [tag]
+  [{:keys [restate-image service-image]}]
   (reify jepsen.db/DB
     (setup! [_ test node]
-      (let [restate-img (str "ghcr.io/restatedev/restate:" tag)
-            service-img (str "ghcr.io/restatedev/jepsen:latest")
-            ]
         (if (= node (-> test :nodes first))
           (do
             ;;; n1 will have restate
-            (info node "installing restate" tag)
+            (info node "installing restate" restate-image)
             (c/su
               ;; not sure what's the problem with debain+vagrant, but this is needed, and it is getting too late
               ;; to figure it out.
@@ -25,8 +22,8 @@
               ;;
               ;; setup restate
               ;;
-              (c/exec :docker :pull restate-img)
-              (c/exec :docker :run :-itd :--rm :-p "8081:8081" :-p "9090:9090" restate-img)
+              (c/exec :docker :pull restate-image)
+              (c/exec :docker :run :-itd :--rm :-p "8081:8081" :-p "9090:9090" restate-image)
               (info node "restate has started")
               ;;
               ;; setup envoy as a side-car load balancer
@@ -42,12 +39,12 @@
               ))
           (do
             ;;; n2 ... will be running services
-            (info node "installing services")
+            (info node "installing services " service-image)
             (c/su
               (c/exec :systemctl :restart :docker)
-              (c/exec :docker :pull service-img)
-              (c/exec :docker :run :-itd :--rm :-p "8000:8000" service-img)
-              )))))
+              (c/exec :docker :pull service-image)
+              (c/exec :docker :run :-itd :--rm :-p "8000:8000" service-image)
+              ))))
 
     (teardown! [_ _ node]
       (info node "tearing down")

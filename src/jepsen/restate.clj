@@ -6,7 +6,6 @@
                     [tests :as tests])
             [jepsen.os.debian :as debian]
             [jepsen.restate-client :as client]
-
             [jepsen.restate-cluster :as cluster]
             [knossos.model :as model]
             )
@@ -21,7 +20,9 @@
   (merge tests/noop-test
          {:name            "restate"
           :os              debian/os
-          :db              (cluster/make-single-cluster "latest")
+          :db              (cluster/make-single-cluster {:restate-image "ghcr.io/restatedev/restate:latest"
+                                                         :service-image "ghcr.io/restatedev/jepsen:latest"
+                                                         })
           :pure-generators true
           :client          (client/make-client)
           :checker         (checker/compose
@@ -29,10 +30,7 @@
                               :perf   (checker/perf)
                               :linear (checker/linearizable {:model     (model/cas-register 0)
                                                              :algorithm :linear})})
-
           :generator       (->> (gen/mix jepsen.ops/all)
-                                ;  uncomment the following line to slow down the test
-                                ;       (gen/stagger 1)
                                 (gen/nemesis nil)
                                 ; uncomment to introduce faults
                                 ;  (gen/nemesis
