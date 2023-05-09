@@ -19,7 +19,7 @@
                            :label "restate"
                            :image restate-image
                            :ports [8081 9090]
-                           :mount [[restate-volume "/target"]]
+                           :mount [[restate-volume "/target:rw"]]
                            }))
 
 (defn stop-restate []
@@ -30,7 +30,7 @@
                            :label "envoy"
                            :image "envoyproxy/envoy:v1.20.0"
                            :ports [8000]
-                           :mount [["/envoy.yaml" "/config/envoy.yaml"]]
+                           :mount [["/envoy.yaml" "/config/envoy.yaml:ro"]]
                            :args  [:envoy "--config-path" "/config/envoy.yaml"]
                            }
                           ))
