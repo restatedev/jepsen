@@ -13,7 +13,6 @@
     (setup! [_ test node]
       (let [restate-img (str "ghcr.io/restatedev/restate:" tag)
             service-img (str "ghcr.io/restatedev/jepsen:latest")
-            ;envoy-conf (create-envoy-conf (-> test :nodes rest))
             ]
         (if (= node (-> test :nodes first))
           (do
