@@ -36,7 +36,7 @@
                                                                      :algorithm :linear})
                                     :timeline (timeline/html)}))})
 
-       ;   :nemesis         (cluster/container-killer)
+          :nemesis         (cluster/container-killer)
           :generator  (->> (independent/concurrent-generator
                                                10
                                                (rest (range)) ; use key values greater than 0
