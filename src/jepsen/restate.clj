@@ -17,8 +17,8 @@
 
 (defrecord NoopRemote []
   jepsen.control.core/Remote
-  (connect [this conn-spec])
-  (disconnect! [this])
+  (connect [this conn-spec] this)
+  (disconnect! [this] this)
   (execute! [this ctx action]
     (assoc action
                          :out   nil
@@ -27,8 +27,8 @@
                          ; interesting here?
                          :exit  0))
 
-  (upload! [this ctx local-paths remote-path _opts])
-  (download! [this ctx remote-paths local-path _opts]))
+  (upload! [this ctx local-paths remote-path _opts] this)
+  (download! [this ctx remote-paths local-path _opts] this))
 
 (defn noop-remote [] (NoopRemote.))
 
@@ -38,9 +38,16 @@
   [opts]
   (merge tests/noop-test
          {
+                 :ssh {:dummy?                   true
+                             :username                  nil
+                             :password                  nil
+                             :strict-host-key-checking  nil
+                             :private-key-path          nil
+                       }
+          :concurrency  100
           :name            "restate"
-          :control          (noop-remote)
-          ;:db               (cluster/make-single-cluster)
+          :remote          (noop-remote)
+          :net              jepsen.net/noop
           :pure-generators true
           :client          (client/make-client)
 
@@ -61,8 +68,7 @@
                                                        (gen/sleep 5)
                                                        {:type :info, :f :stop}]))
                                              (gen/time-limit (:time-limit opts)))
-          }
-         opts))
+          }))
 
 (defn -main
   "Handles command line arguments. Can either run a test, or a web server for

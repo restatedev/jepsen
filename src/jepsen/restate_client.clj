@@ -10,6 +10,7 @@
 (defrecord RestateClient [conn]
   client/Client
   (open! [this test node]
+      (info node "hi")
       (assoc this :conn (http/make)))
 
   (setup! [this _]
