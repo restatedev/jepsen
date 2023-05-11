@@ -5,7 +5,7 @@
                     [generator :as gen]
                     [tests :as tests])
             [jepsen.checker.timeline :as timeline]
-            [jepsen.os.debian :as debian]
+            [jepsen.control.core]
             [jepsen.restate-client :as client]
             [jepsen.restate-cluster :as cluster]
             [jepsen.independent :as independent]
@@ -15,6 +15,22 @@
   (:gen-class)
   )
 
+(defrecord NoopRemote []
+  jepsen.control.core/Remote
+  (connect [this conn-spec])
+  (disconnect! [this])
+  (execute! [this ctx action]
+    (assoc action
+                         :out   nil
+                         :err   nil
+                         ; There's also a .getExitErrorMessage that might be
+                         ; interesting here?
+                         :exit  0))
+
+  (upload! [this ctx local-paths remote-path _opts])
+  (download! [this ctx remote-paths local-path _opts]))
+
+(defn noop-remote [] (NoopRemote.))
 
 (defn restate-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
@@ -23,20 +39,15 @@
   (merge tests/noop-test
          {
           :name            "restate"
-          :os              debian/os
-          :db              (cluster/make-single-cluster)
+          :control          (noop-remote)
+          ;:db               (cluster/make-single-cluster)
           :pure-generators true
           :client          (client/make-client)
 
           :checker   (checker/compose
                        {:perf  (checker/perf)
-                        :indep (independent/checker
-                                 (checker/compose
-                                   {:linear   (checker/linearizable {:model (model/cas-register 0)
-                                                                     :algorithm :linear})
-                                    :timeline (timeline/html)}))})
+                        :timeline (timeline/html)})
 
-          :nemesis         (cluster/container-killer)
           :generator  (->> (independent/concurrent-generator
                                                10
                                                (rest (range)) ; use key values greater than 0

@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  restate:
+    image: "ghcr.io/restatedev/restate:latest"
+    environment:
+      RUST_LOG: DEBUG
+    ports:
+      - "8081:8081" # meta
+      - "9090:9090" # ingress
+  discover:
+    image: "curlimages/curl:7.88.1"
+    depends_on:
+      - restate
+      - service
+    command: |
+      --fail restate:8081/endpoint/discover --json '{"uri": "http://service:8000"}'
+  service:
+    image: "ghcr.io/restatedev/jepsen:latest"
+    ports:
+      - "8000:8000" # restate protocol
