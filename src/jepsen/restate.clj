@@ -32,42 +32,31 @@
 
 (defn noop-remote [] (NoopRemote.))
 
+
+(def time-limit-seconds (* 1 10))
+(def number-of-keys 10)
+
 (defn restate-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
   :concurrency, ...), constructs a test map."
   [opts]
   (merge tests/noop-test
          {
-                 :ssh {:dummy?                   true
-                             :username                  nil
-                             :password                  nil
-                             :strict-host-key-checking  nil
-                             :private-key-path          nil
-                       }
           :concurrency  100
           :name            "restate"
           :remote          (noop-remote)
           :net              jepsen.net/noop
           :pure-generators true
           :client          (client/make-client)
-
-          :checker   (checker/compose
-                       {:perf  (checker/perf)
-                        :timeline (timeline/html)})
-
+          :checker  (checker/perf)
           :generator  (->> (independent/concurrent-generator
-                                               10
+                                               number-of-keys
                                                (rest (range)) ; use key values greater than 0
                                                (fn [_]
                                                  (->> (gen/mix jepsen.ops/all)
-                                                      (gen/stagger 1/50)
+                                                     ; (gen/stagger 1/50)
                                                       (gen/limit 100))))
-                                             (gen/nemesis
-                                               (cycle [(gen/sleep 5)
-                                                       {:type :info, :f :start}
-                                                       (gen/sleep 5)
-                                                       {:type :info, :f :stop}]))
-                                             (gen/time-limit (:time-limit opts)))
+                                             (gen/time-limit time-limit-seconds))
           }))
 
 (defn -main
