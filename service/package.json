@@ -13,7 +13,7 @@
   "author": "<your name here>",
   "license": "ISC",
   "dependencies": {
-    "@restatedev/restate-sdk": "^1.0.11",
+    "@restatedev/restate-sdk": "1.0.21",
     "protobufjs": "^7.2.2",
     "ts-proto": "^1.140.0"
   },
