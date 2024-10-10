@@ -10,7 +10,7 @@
 
 
 (def service-image "ghcr.io/restatedev/jepsen:latest")
-(def restate-image "ghcr.io/restatedev/restate:latest")
+(def restate-image "ghcr.io/restatedev/restate:main")
 
 (def restate-volume "restate")
 
@@ -18,7 +18,7 @@
   (docker/start-container {
                            :label "restate"
                            :image restate-image
-                           :ports [8081 9090]
+                           :ports [8080 9070]
                            :mount [[restate-volume "/target:rw"]]
                            }))
 
@@ -29,7 +29,7 @@
   (docker/start-container {
                            :label "envoy"
                            :image "envoyproxy/envoy:v1.20.0"
-                           :ports [8000]
+                           :ports [9080]
                            :mount [["/envoy.yaml" "/config/envoy.yaml:ro"]]
                            :args  [:envoy "--config-path" "/config/envoy.yaml"]
                            }
@@ -39,7 +39,7 @@
   []
   (docker/start-container {
                            :label "service"
-                           :ports [8000]
+                           :ports [9080]
                            :image service-image
                            }))
 (defn stop-service-endpoint

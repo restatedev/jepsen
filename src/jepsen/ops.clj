@@ -21,7 +21,7 @@
 ;; read
 ;;
 
-(defmethod op->grpc-method :read [_] "/Read")
+(defmethod op->grpc-method :read [_] "/read")
 (defmethod op->request :read [op]
   {:key (op->key op)})
 

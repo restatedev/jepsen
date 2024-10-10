@@ -3,7 +3,7 @@ static_resources:
     - address:
         socket_address:
           address: 0.0.0.0
-          port_value: 8000
+          port_value: 9080
       filter_chains:
         - filters:
             - name: envoy.filters.network.http_connection_manager
@@ -38,22 +38,22 @@ static_resources:
                   address:
                     socket_address:
                       address: 192.168.56.103
-                      port_value: 8000
+                      port_value: 9080
               - endpoint:
                   address:
                     socket_address:
                       address: 192.168.56.104
-                      port_value: 8000
+                      port_value: 9080
               - endpoint:
                   address:
                     socket_address:
                       address: 192.168.56.105
-                      port_value: 8000
+                      port_value: 9080
               - endpoint:
                   address:
                     socket_address:
                       address: 192.168.56.102
-                      port_value: 8000
+                      port_value: 9080
 admin:
   access_log_path: /dev/null
   address:

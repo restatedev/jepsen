@@ -11,7 +11,7 @@
   client/Client
   (open! [this test node]
     (let [restate-node (-> test :nodes first)
-          baseurl (str "http://" restate-node ":9090/org.example.JepsenService")
+          baseurl (str "http://" restate-node ":8080/JepsenService")
           ]
       (info "New client talking to " restate-node)
       (assoc this :baseurl baseurl
@@ -26,8 +26,8 @@
       (info "Starting auto discovery")
       (info "Discovery"
             (http/post (:conn this)
-                       (str "http://" (:restate-node this) ":8081/endpoint/discover") ; <-- meta
-                       {:uri (str "http://" (:restate-node this) ":8000")} ; <-- envoy
+                       (str "http://" (:restate-node this) ":9070/deployments") ; <-- meta
+                       {:uri (str "http://" (:restate-node this) ":9080")} ; <-- envoy
                        )))
     this)
 
