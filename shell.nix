@@ -2,13 +2,10 @@
 pkgs.mkShell rec {
     buildInputs = with pkgs; [
     	clojure
-	leiningen
-	vagrant
+			leiningen
+			vagrant
     	just
-	gnuplot
-
-	nodejs # for the service
+			gnuplot
+			nodejs 
     ];
 }
-
-

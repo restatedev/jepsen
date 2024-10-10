@@ -1,51 +1,31 @@
 import * as restate from "@restatedev/restate-sdk";
 
-import {
-  JepsenService,
-  WriteRequest,
-  WriteResponse,
-  ReadRequest,
-  ReadResponse,
-  CasRequest,
-  CasResponse,
-  protoMetadata,
-} from "./generated/proto/example";
+const jepsenService = restate.object({
+	name: "JepsenService",
+	handlers: {
 
+		read: async (ctx: restate.ObjectContext) => {
+			const value = (await ctx.get<number>("value")) ?? 0;
+			return {value: value};
+		},
 
-export class MyExampleService implements JepsenService {
+		write: async (ctx: restate.ObjectContext, request: number) => {
+			ctx.set("value", request);
+		},
 
-	async read(request: ReadRequest): Promise<ReadResponse> {
-		const ctx = restate.useContext(this);
-		const value = (await ctx.get<number>("value")) || 0;
-		return ReadResponse.create({value: value});
-	}
-
-
-	async write(request: WriteRequest): Promise<WriteResponse> {
-		const ctx = restate.useContext(this);
-		ctx.set("value", request.value);
-		return WriteResponse.create({});
-	}
-
-
-	async cas(request: CasRequest): Promise<CasResponse> {
-		const ctx = restate.useContext(this);
-		const value = (await ctx.get<number>("value")) || 0;
-		if (request.compare === value) {
-		     ctx.set("value", request.exchange);
-			return CasResponse.create({success: true});
-		} else {
-			return CasResponse.create({success: false});
+		cas: async (ctx: restate.ObjectContext, request: {compare: number, exchange: number}) => {
+			const value = (await ctx.get<number>("value")) ?? 0;
+			if (request.compare === value) {
+				ctx.set("value", request.exchange);
+				return {success: true};
+			} else {
+				return {success: false};
+			}
 		}
 	}
-
-}
+});
 
 restate
-  .createServer()
-  .bindService({
-    descriptor: protoMetadata,
-    service: "JepsenService",
-    instance: new MyExampleService(),
-  })
-  .listen(8000);
+  .endpoint()
+  .bind(jepsenService)
+  .listen();

@@ -1,11 +1,22 @@
-FROM node:18
+FROM node:22-alpine
+
+# dumb-init helps handling SIGTERM and SIGINT correctly
+RUN apk add dumb-init
 
 WORKDIR /usr/src/app
 
-COPY . .
+# copy package.json and package-lock.json separately to cache dependencies
+COPY package*.json .
+RUN npm install
 
-RUN ["npm", "run", "build"]
+COPY --chown=node:node . .
 
-EXPOSE 8000
-CMD [ "node", "dist/app.js"]
+RUN npm run build
 
+RUN npm prune --production
+ENV NODE_ENV=production
+ENV PORT=9080
+
+EXPOSE 9080
+USER node
+CMD ["dumb-init", "node", "./dist/app.js"]
