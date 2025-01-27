@@ -3,4 +3,3 @@ make-services:
 	cd services
 	npm clean-install
 	npm run bundle
-	cd ..
