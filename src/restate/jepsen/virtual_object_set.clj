@@ -2,26 +2,39 @@
   "A set service client backed by a Restate Virtual Object.
   Uses regular HTTP ingress and requires the Set service to be deployed."
   (:require
+   [cheshire.core :as json]
+   [clojure.tools.logging :refer [info]]
+   [hato.client :as hc]
    [jepsen [client :as client]
     [checker :as checker]
     [generator :as gen]]
-   [hato.client :as hc]
-   [cheshire.core :as json]
-   [slingshot.slingshot :refer [try+]]
    [restate [http :as hu]]
-   [restate.jepsen.set-ops :refer [r w]]))
+   [restate.jepsen.set-ops :refer [r w]]
+   [slingshot.slingshot :refer [try+]]))
+
+(defn restate-server-node?
+  "Determines whether a given node is a restate-server node."
+  [node opts] (< (.indexOf (:nodes opts) node)
+                 (- (count (:nodes opts)) (:dedicated-service-nodes opts))))
+
+(defn ingress-url [node opts]
+  (if (restate-server-node? node opts)
+    (str "http://" node ":8080")
+    ;; TODO: pick a random restate-server node
+    (str "http://" (first (:nodes opts)) ":8080")))
 
 (defrecord
- SetServiceClient [key] client/Client
-
- (setup! [this _test]
-   (hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this)))
+ SetServiceClient [key opts] client/Client
 
  (open! [this test node]
    (assoc this
           :node (str "n" (inc (.indexOf (:nodes test) node)))
-          :ingress-url (str "http://" node ":8080")
+          :ingress-url (ingress-url node opts)
           :defaults (hu/defaults hu/client)))
+
+ (setup! [this _test]
+   (info "Using service ingress URL" (:ingress-url this))
+   (hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this)))
 
  (invoke! [this _test op]
    (try+
@@ -54,7 +67,7 @@
 
 (defn workload
   "Restate service-backed Set test workload."
-  [_opts]
-  {:client    (SetServiceClient. "jepsen-set")
+  [opts]
+  {:client    (SetServiceClient. "jepsen-set" opts)
    :checker   (checker/set-full {:linearizable? true})
    :generator (gen/reserve 5 (repeat (r)) (w))})
