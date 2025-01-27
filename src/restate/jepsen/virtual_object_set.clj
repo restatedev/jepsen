@@ -8,7 +8,8 @@
    [hato.client :as hc]
    [cheshire.core :as json]
    [slingshot.slingshot :refer [try+]]
-   [restate [http :as hu]]))
+   [restate [http :as hu]]
+   [restate.jepsen.set-ops :refer [r w]]))
 
 (defrecord
  SetServiceClient [key] client/Client
@@ -50,15 +51,6 @@
  (teardown! [_ _test])
 
  (close! [_ _test]))
-
-(defn w
-  []
-  (->> (range)
-       (map (fn [x] {:type :invoke, :f :add, :value x}))))
-
-(defn r
-  []
-  {:type :invoke, :f :read, :value nil})
 
 (defn workload
   "Restate service-backed Set test workload."

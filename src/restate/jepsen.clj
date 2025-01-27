@@ -65,7 +65,7 @@
             :docker
             :run
             :--name=restate
-            :--network=host
+            :--network=host ;; we need this to access AWS IMDS credentials on EC2
             :--add-host :host.docker.internal:host-gateway
             :--detach
             :--volume "/opt/config.toml:/config.toml"
