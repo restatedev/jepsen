@@ -1,0 +1,26 @@
+cluster-name = "restate-jepsen"
+roles = ["metadata-store", "admin", "worker", "log-server"]
+log-filter = "restate_core::network::connection_manager=info,restate_metadata_store::raft=trace,restate_admin::metadata_api=trace,restate=debug,raft=debug"
+# less noisy settings:
+#log-filter = "restate_core::network::connection_manager=info,restate_metadata_store::raft=trace,restate_admin::metadata_api=trace,restate=debug,raft=info"
+log-format = "compact"
+log-disable-ansi-codes = true
+rocksdb-total-memory-size = "100 MB"
+
+[admin]
+heartbeat-interval = "1s"
+default-replication-strategy = "on-all-nodes"
+#log-trim-interval = "5s"
+
+[metadata-store]
+type = "raft"
+
+[metadata-store-client]
+#addresses = ["http://n1:5122/", "http://n2:5122/", "http://n3:5122/"]
+
+[bifrost]
+default-provider = "replicated"
+
+[worker.snapshots]
+#destination = "s3://restate-snapshots-afs1/restate-jepsen-snapshots"
+#snapshot-interval-num-records = 100

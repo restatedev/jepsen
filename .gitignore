@@ -1,9 +1,4 @@
-service/node_modules
-service/dist/
-.idea/
-vagrant/gh_token.json
 /target
-store
 /classes
 /checkouts
 profiles.clj
@@ -16,4 +11,10 @@ pom.xml.asc
 /.prepl-port
 .hgignore
 .hg/
-vagrant/.vagrant
+store/
+.clj-kondo/
+.lsp/
+node-modules/
+/services/dist
+/services/restate-data/
+nodes.txt
