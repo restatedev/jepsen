@@ -95,15 +95,7 @@
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")
-           (ru/restate :deployments :register "http://host.docker.internal:9080" :--yes)
-            ;; (when (> (count (:nodes test)) 2)
-            ;;   (let [replication-factor (int (+ 1 (m/floor (/ (count (:nodes test)) 2))))]
-            ;;     (info "Reconfiguring all logs with replication factor:" replication-factor)
-            ;;     (doseq [log-id (range (:num-partitions opts))]
-            ;;       (ru/restatectl :logs :reconfigure
-            ;;                      :--log-id log-id :--provider :replicated
-            ;;                      :--replication-factor-nodes replication-factor))))
-           )
+           (ru/restate :deployments :register "http://host.docker.internal:9080" :--yes))
 
          (info "Waiting for service deployment")
          (ru/wait-for-deployment))))
