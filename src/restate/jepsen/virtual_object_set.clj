@@ -7,21 +7,13 @@
    [hato.client :as hc]
    [jepsen [client :as client]
     [checker :as checker]
-    [generator :as gen]]
-   [restate [http :as hu]]
+    [generator :as gen]
+    [util :as util]]
+   [restate
+    [util :as u]
+    [http :as hu]]
    [restate.jepsen.set-ops :refer [r w]]
    [slingshot.slingshot :refer [try+]]))
-
-(defn restate-server-node?
-  "Determines whether a given node is a restate-server node."
-  [node opts] (< (.indexOf (:nodes opts) node)
-                 (- (count (:nodes opts)) (:dedicated-service-nodes opts))))
-
-(defn ingress-url [node opts]
-  (if (restate-server-node? node opts)
-    (str "http://" node ":8080")
-    ;; TODO: pick a random restate-server node
-    (str "http://" (first (:nodes opts)) ":8080")))
 
 (defrecord
  SetServiceClient [key opts] client/Client
@@ -29,11 +21,14 @@
  (open! [this test node]
    (assoc this
           :node (str "n" (inc (.indexOf (:nodes test) node)))
-          :ingress-url (ingress-url node opts)
+          :ingress-url (u/ingress-url node opts)
           :defaults (hu/defaults hu/client)))
 
  (setup! [this _test]
-   (info "Using service ingress URL" (:ingress-url this))
+   (info "Using service URL" (:ingress-url this))
+   (util/await-fn (fn [] (->> (hc/get (str (:ingress-url this) "/Set/" key "/get") (:defaults this))
+                              (:status)
+                              (= 200))))
    (hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this)))
 
  (invoke! [this _test op]
@@ -51,8 +46,7 @@
                              {:body (json/generate-string (:value op))}))
              (assoc op :type :ok :node (:node this))))
 
-     ;; for Restate services, a 404 means deployment hasn't yet completed -
-     ;; this is likely replication latency
+     ;; for Restate services, a 404 means deployment hasn't yet completed - unexpected during this phase!
     (catch [:status 404] {} (assoc op :type :fail :error :not-found :node (:node this)))
 
     (catch java.net.ConnectException {} (assoc op :type :fail :error :connect :node (:node this)))
