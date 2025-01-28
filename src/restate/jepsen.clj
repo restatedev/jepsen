@@ -39,7 +39,8 @@
 (defn cluster-setup
   "Cluster setup. Handles homogeneous and heterogeneous Restate/app server clusters."
   [restate-server-setup app-server-setup]
-  (reify db/DB
+  (reify
+    db/DB
     (setup! [_this test node]
       (when (u/app-server-node? node test)
         (db/setup! app-server-setup test node))
@@ -47,12 +48,18 @@
         (db/setup! restate-server-setup test node)))
     (teardown! [_this test node]
       (db/teardown! app-server-setup test node)
-      (db/teardown! restate-server-setup test node))))
+      (db/teardown! restate-server-setup test node))
+
+    db/LogFiles
+    (log-files [_this test node]
+      (db/log-files app-server-setup test node)
+      (db/log-files restate-server-setup test node))))
 
 (defn restate
   "A deployment of Restate server."
   [opts]
-  (reify db/DB
+  (reify
+    db/DB
     (setup! [_db test node]
       (when (not (:dummy? (:ssh test)))
         (info node "Setting up Restate")
@@ -119,11 +126,12 @@
          (c/exec :rm :-rf server-restate-root)
          (c/exec :docker :rm :-f "restate" :|| :true))))
 
-    db/LogFiles (log-files [_this test _node]
-                  (when (not (:dummy? (:ssh test)))
-                    (c/su (c/exec* "docker logs restate" "&>" server-logfile)
-                          (c/exec :chmod :644 server-logfile))
-                    [server-logfile services-logfile]))))
+    db/LogFiles
+    (log-files [_this test _node]
+      (when (not (:dummy? (:ssh test)))
+        (c/su (c/exec* "docker logs restate" "&>" server-logfile)
+              (c/exec :chmod :644 server-logfile))
+        [server-logfile services-logfile]))))
 
 (defn app-server
   "A deployment of a Restate application (= set of Restate SDK services)."
