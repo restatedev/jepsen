@@ -1,6 +1,7 @@
 (ns restate.util
   (:require
    [clojure.tools.logging :refer [info]]
+   [slingshot.slingshot :refer [try+]]
    [restate.http :as hu]
    [hato.client :as hc]
    [jepsen
@@ -65,9 +66,11 @@
 
 (defn await-url [url]
   (let [client hu/client]
-    (util/await-fn (fn [] (->> (hc/get url (hu/defaults client))
-                               (:status)
-                               (= 200))))))
+    (util/await-fn (fn [] (try+ (->> (hc/get url (hu/defaults client))
+                                     (:status)
+                                     (= 200))
+                                (catch java.lang.Object {} false)))
+                   {:log-message (str "Waiting for " url "...")})))
 
 (defn await-service-deployment []
   (util/await-fn
