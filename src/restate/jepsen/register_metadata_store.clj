@@ -16,7 +16,7 @@
    [restate.jepsen.register-ops :refer [r w cas]]))
 
 (defrecord
- RegisterClient [] client/Client
+ RegisterMetadatsStoreClient [] client/Client
 
  (setup! [_this _test])
 
@@ -82,7 +82,7 @@
 (defn workload
   "Linearizable reads, writes, and compare-and-set operations on independent keys."
   [opts]
-  {:client    (RegisterClient.)
+  {:client    (RegisterMetadatsStoreClient.)
    :checker   (independent/checker
                (checker/linearizable {:model     (model/cas-register)
                                       :algorithm :linear}))

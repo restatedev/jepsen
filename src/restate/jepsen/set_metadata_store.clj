@@ -12,7 +12,7 @@
    [restate.jepsen.set-ops :refer [r w]]))
 
 (defrecord
- SetClient [key] client/Client
+ SetMetadatsStoreClient [key] client/Client
 
  (open! [this test node]
    (assoc this
@@ -61,6 +61,6 @@
 (defn workload
   "Restate Metadata Store-backed Set test workload."
   [_opts]
-  {:client    (SetClient. "jepsen-set")
+  {:client    (SetMetadatsStoreClient. "jepsen-set")
    :checker   (checker/set-full {:linearizable? true})
    :generator (gen/reserve 5 (repeat (r)) (w))})

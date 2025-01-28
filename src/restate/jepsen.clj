@@ -15,10 +15,10 @@
    [jepsen.control.util :as cu]
    [jepsen.os.debian :as debian]
    [restate.util :as u]
-   [restate.jepsen.metadata-store-set :as mds-set]
-   [restate.jepsen.metadata-store-register :as mds-register]
-   [restate.jepsen.virtual-object-register :as vo-register]
-   [restate.jepsen.virtual-object-set :as vo-set]))
+   [restate.jepsen.metadata-store-set :as set-mds]
+   [restate.jepsen.virtual-object-set :as set-vo]
+   [restate.jepsen.metadata-store-register :as register-mds]
+   [restate.jepsen.virtual-object-register :as register-vo]))
 
 (def resources-relative-path ".")
 (def server-restate-root "/opt/restate/")
@@ -154,10 +154,10 @@
 
 (def workloads
   "A map of workloads."
-  {"register-vo"  vo-register/workload
-   "register-mds" mds-register/workload
-   "set-vo"       vo-set/workload
-   "set-mds"      mds-set/workload})
+  {"set-mds"      set-mds/workload
+   "set-vo"       set-vo/workload
+   "register-mds" register-mds/workload
+   "register-vo"  register-vo/workload})
 
 (def nemeses
   "A map of nemeses."
