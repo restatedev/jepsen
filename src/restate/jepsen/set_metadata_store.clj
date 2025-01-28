@@ -40,7 +40,8 @@
                                        (:defaults this))
                                (:body)
                                (json/parse-string)
-                               set))
+                               set)
+                   :node (:node this))
 
       :add
       (let [[new-set stored-version]

@@ -35,11 +35,12 @@
  (invoke! [this _test op]
    (try+
     (case (:f op)
-      :read (assoc op :type :ok :value
+      :read (assoc op :type :ok  :value
                    (->> (hc/post (str (:ingress-url this) "/Set/" key "/get")
                                  (:defaults this))
                         (:body)
-                        (json/parse-string)))
+                        (json/parse-string))
+                   :node (:node this))
 
       :add (do
              (hc/post (str (:ingress-url this) "/Set/" key "/add")
