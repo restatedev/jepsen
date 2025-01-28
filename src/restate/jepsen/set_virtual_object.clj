@@ -1,9 +1,9 @@
-(ns restate.jepsen.virtual-object-set
+(ns restate.jepsen.set-virtual-object
   "A set service client backed by a Restate Virtual Object.
   Uses regular HTTP ingress and requires the Set service to be deployed."
   (:require
-   [cheshire.core :as json]
    [clojure.tools.logging :refer [info]]
+   [cheshire.core :as json]
    [hato.client :as hc]
    [jepsen [client :as client]
     [checker :as checker]
@@ -29,7 +29,8 @@
    (util/await-fn (fn [] (->> (hc/get (str (:ingress-url this) "/Set/" key "/get") (:defaults this))
                               (:status)
                               (= 200))))
-   (hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this)))
+   (when (:dummy? (:ssh opts))
+     (hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this))))
 
  (invoke! [this _test op]
    (try+

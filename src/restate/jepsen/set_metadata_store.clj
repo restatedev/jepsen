@@ -1,27 +1,31 @@
-(ns restate.jepsen.metadata-store-set
+(ns restate.jepsen.set-metadata-store
   "A set client backed by the Restate Metadata Store HTTP API.
   Note: restate-server must be compiled with the metadata-api feature."
   (:require
+   [clojure.tools.logging :refer [info]]
    [jepsen [client :as client]
     [checker :as checker]
     [generator :as gen]]
    [hato.client :as hc]
    [cheshire.core :as json]
    [slingshot.slingshot :refer [try+]]
-   [restate [http :as hu]]
+   [restate
+    [util :as u]
+    [http :as hu]]
    [restate.jepsen.set-ops :refer [r w]]))
 
 (defrecord
- SetMetadatsStoreClient [key] client/Client
+ SetMetadatsStoreClient [key opts] client/Client
 
  (open! [this test node]
    (assoc this
           :node (str "n" (inc (.indexOf (:nodes test) node)))
-          :endpoint (str "http://" node ":9070/metadata/")
+          :endpoint (str (u/admin-url node opts) "/metadata/")
           :defaults (hu/defaults hu/client)
           :random (new java.util.Random)))
 
  (setup! [this _test]
+   (info "Using service URL" (:endpoint this))
    (hc/put (str (:endpoint this) key)
            (merge (:defaults this)
                   {:body (json/generate-string #{})
@@ -60,7 +64,7 @@
 
 (defn workload
   "Restate Metadata Store-backed Set test workload."
-  [_opts]
-  {:client    (SetMetadatsStoreClient. "jepsen-set")
+  [opts]
+  {:client    (SetMetadatsStoreClient. "jepsen-set" opts)
    :checker   (checker/set-full {:linearizable? true})
    :generator (gen/reserve 5 (repeat (r)) (w))})

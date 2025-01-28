@@ -15,10 +15,10 @@
    [jepsen.control.util :as cu]
    [jepsen.os.debian :as debian]
    [restate.util :as u]
-   [restate.jepsen.metadata-store-set :as set-mds]
-   [restate.jepsen.virtual-object-set :as set-vo]
-   [restate.jepsen.metadata-store-register :as register-mds]
-   [restate.jepsen.virtual-object-register :as register-vo]))
+   [restate.jepsen.set-metadata-store :as set-mds]
+   [restate.jepsen.set-virtual-object :as set-vo]
+   [restate.jepsen.register-metadata-store :as register-mds]
+   [restate.jepsen.register-virtual-object :as register-vo]))
 
 (def resources-relative-path ".")
 (def server-restate-root "/opt/restate/")

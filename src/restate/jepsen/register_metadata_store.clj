@@ -1,7 +1,8 @@
-(ns restate.jepsen.metadata-store-register
+(ns restate.jepsen.register-metadata-store
   "A CAS register client implemented on top of the Restate Metadata Store HTTP API.
   Note: restate-server must be compiled with the metadata-api feature."
   (:require
+   [clojure.tools.logging :refer [info]]
    [jepsen
     [checker :as checker]
     [client :as client]
@@ -11,34 +12,42 @@
    [hato.client :as hc]
    [cheshire.core :as json]
    [slingshot.slingshot :refer [try+]]
-   [restate [http :as hu]]
+   [restate
+    [util :as u]
+    [http :as hu]]
    [restate.jepsen.common :refer [parse-long-nil]]
    [restate.jepsen.register-ops :refer [r w cas]]))
 
 (defrecord
- RegisterMetadatsStoreClient [] client/Client
-
- (setup! [_this _test])
+ RegisterMetadatsStoreClient [opts] client/Client
 
  (open! [this test node] (assoc this
                                 :node (str "n" (inc (.indexOf (:nodes test) node)))
-                                :admin-api (str "http://" node ":9070")
+                                :endpoint (str (u/admin-url node opts) "/metadata/")
                                 :defaults (hu/defaults hu/client)
                                 :random (new java.util.Random)))
+
+ (setup! [this _test]
+   (info "Using service URL" (:endpoint this))
+   (when (:dummy? (:ssh opts))
+     (doseq [k (range 5)]
+       (hc/put (str (:endpoint this) k)
+               (merge (:defaults this)
+                      {:body (json/generate-string #{})
+                       :headers {"if-match" "*" "etag" "1"}})))))
 
  (invoke! [this _test op]
    (let [[k v] (:value op)]
      (try+
       (case (:f op)
-        :read (try+ (let [value (->> (hc/get (str (:admin-api this) "/metadata/" k)
-                                             (:defaults this))
+        :read (try+ (let [value (->> (hc/get (str (:endpoint this) k)  (:defaults this))
                                      (:body)
                                      (parse-long-nil))]
                       (assoc op :type :ok :value (independent/tuple k value) :node (:node this)))
                     (catch [:status 404] {}
                       (assoc op :type :ok :value (independent/tuple k nil) :node (:node this))))
         :write (do
-                 (hc/put (str (:admin-api this) "/metadata/" k)
+                 (hc/put (str (:endpoint this) k)
                          (merge (:defaults this)
                                 {:body (json/generate-string v)
                                  :headers {"if-match" "*"
@@ -48,14 +57,14 @@
         :cas (let [[expected-value new-value] v
                    [stored-value stored-version]
                    (try+
-                    (let [res (hc/get (str (:admin-api this) "/metadata/" k)
+                    (let [res (hc/get (str (:endpoint this) k)
                                       (:defaults this))]
                       [(parse-long-nil (:body res)) (parse-long-nil (get-in res [:headers "etag"]))])
                     ;; this key is unset
                     (catch [:status 404] {} [nil nil]))]
 
                (if (= stored-value expected-value)
-                 (do (hc/put (str (:admin-api this) "/metadata/" k)
+                 (do (hc/put (str (:endpoint this) k)
                              (merge (:defaults this)
                                     {:body (json/generate-string new-value)
                                      :headers {"if-match" stored-version
@@ -82,7 +91,7 @@
 (defn workload
   "Linearizable reads, writes, and compare-and-set operations on independent keys."
   [opts]
-  {:client    (RegisterMetadatsStoreClient.)
+  {:client    (RegisterMetadatsStoreClient. opts)
    :checker   (independent/checker
                (checker/linearizable {:model     (model/cas-register)
                                       :algorithm :linear}))

@@ -1,28 +1,39 @@
-(ns restate.jepsen.virtual-object-register
+(ns restate.jepsen.register-virtual-object
   "A CAS register service client implemented as a Restate Virtual Object.
   Uses regular HTTP ingress and requires the Register service to be deployed."
   (:require
+   [clojure.tools.logging :refer [info]]
    [jepsen [client :as client]
     [checker :as checker]
     [independent :as independent]
-    [generator :as gen]]
+    [generator :as gen]
+    [util :as util]]
    [knossos.model :as model]
    [hato.client :as hc]
    [cheshire.core :as json]
    [slingshot.slingshot :refer [try+]]
-   [restate [http :as hu]]
+   [restate
+    [util :as u]
+    [http :as hu]]
    [restate.jepsen.common :refer [parse-long-nil]]
    [restate.jepsen.register-ops :refer [r w cas]]))
 
 (defrecord
- RegisterServiceClient [] client/Client
-
- (setup! [_this _test])
+ RegisterServiceClient [opts] client/Client
 
  (open! [this test node] (assoc this
                                 :node (str "n" (inc (.indexOf (:nodes test) node)))
-                                :ingress-url (str "http://" node ":8080")
+                                :ingress-url (u/ingress-url node opts)
                                 :defaults (hu/defaults hu/client)))
+
+ (setup! [this _test]
+   (info "Using service URL" (:ingress-url this))
+   (util/await-fn (fn [] (->> (hc/get (str (:ingress-url this) "/Register/0/get") (:defaults this))
+                              (:status)
+                              (= 200))))
+   (when (:dummy? (:ssh opts))
+     (doseq [k (range 5)]
+       (hc/post (str (:ingress-url this) "/Register/" k "/clear") (:defaults this)))))
 
  (invoke! [this _test op]
    (let [[k v] (:value op)]
@@ -67,7 +78,7 @@
 (defn workload
   "Restate service-backed Register test workload."
   [opts]
-  {:client    (RegisterServiceClient.)
+  {:client    (RegisterServiceClient. opts)
    :checker   (independent/checker
                (checker/linearizable {:model     (model/cas-register)
                                       :algorithm :linear}))

@@ -14,7 +14,6 @@
   (c/exec :docker :exec :restate :restatectl cmd args))
 
 (defn get-metadata-service-member-count []
-  (info "Metadata config:" (restatectl :meta :status))
   (-> (restatectl :meta :status :| :grep "Member .*\\[.\\+\\]" :| :wc :-l)
       Integer/parseInt))
 
@@ -31,7 +30,6 @@
    (fn [] (when (= (get-logs-count) expected-count) true))))
 
 (defn get-partition-processors-count [status]
-  (info "Partitons config:" (restatectl :partition :status))
   (-> (restatectl :meta :status :| :grep (str " " status " ") :| :wc :-l)
       Integer/parseInt))
 
@@ -77,6 +75,15 @@
   application service components only. Given a node index, this function returns
   whether the given node should run services."
   [node opts] (or (= 0 (:dedicated-service-nodes opts)) (not (restate-server-node? node opts))))
+
+(defn admin-url
+  "Given a node id, determine the appropriate admin URL to call. In homogeneous
+  clusters, the URL is based on the node address. In heterogeneous clusters,
+  app-server nodes get a statically-assigned random restate-server node to call."
+  [node opts]
+  (if (restate-server-node? node opts)
+    (str "http://" node ":9070")
+    (str "http://" (rand-nth (restate-server-nodes opts)) ":9070")))
 
 (defn ingress-url
   "Given a node id, determine the appropriate ingress URL to call. In homogeneous
