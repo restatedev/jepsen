@@ -231,17 +231,22 @@
             :db              (cluster-setup (restate opts) (app-server opts))
             :client          (:client workload)
             :nemesis         (get nemeses (:nemesis opts))
-            :generator       (gen/phases
-                              (->> (:generator workload)
-                                   (gen/stagger (/ (:rate opts)))
-                                   (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
-                                                        (gen/sleep 5) {:type :info, :f :stop}]))
-                                   (gen/time-limit (:time-limit opts)))
-                              (gen/log "Healing cluster")
-                              (gen/once (gen/nemesis [{:type :info, :f :stop}]))
-                              (->> (:generator workload)
-                                   (gen/stagger (/ (:rate opts)))
-                                   (gen/time-limit 5)))
+            :generator       (if (= (:nemesis opts) "none")
+                               (->> (:generator workload)
+                                    (gen/stagger (/ (:rate opts)))
+                                    (gen/time-limit (:time-limit opts))
+                                    (gen/clients))
+                               (gen/phases
+                                (->> (:generator workload)
+                                     (gen/stagger (/ (:rate opts)))
+                                     (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
+                                                          (gen/sleep 5) {:type :info, :f :stop}]))
+                                     (gen/time-limit (:time-limit opts)))
+                                (gen/log "Healing cluster")
+                                (gen/once (gen/nemesis [{:type :info, :f :stop}]))
+                                (->> (:generator workload)
+                                     (gen/stagger (/ (:rate opts)))
+                                     (gen/time-limit 5))))
             :checker         (checker/compose
                               {:perf       (checker/perf)
                                :stats      (checker/stats)
