@@ -63,15 +63,18 @@
       nil)
     (merge {:log-message (str "Waiting for port " port " ...")} opts))))
 
-(defn wait-for-deployment []
+(defn await-url [url]
+  (let [client hu/client]
+    (util/await-fn (fn [] (->> (hc/get url (hu/defaults client))
+                               (:status)
+                               (= 200))))))
+
+(defn await-service-deployment []
   (util/await-fn
    (fn [] (>= (get-deployments-count) 2))) ;; expecting at least Set + Register
 
-  (info "Waiting for service to become callable")
-  (let [client hu/client]
-    (util/await-fn (fn [] (->> (hc/get "http://localhost:8080/Set/0/get" (hu/defaults client))
-                               (:status)
-                               (= 200))))))
+  (info "Waiting for service to become callable...")
+  (await-url "http://localhost:8080/Set/0/get"))
 
 (defn restate-server-node-count [opts] (- (count (:nodes opts)) (:dedicated-service-nodes opts)))
 

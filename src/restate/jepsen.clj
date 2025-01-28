@@ -67,7 +67,13 @@
          (c/upload (str resources-relative-path "/resources/restate-server.toml") "/opt/config.toml")
          (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
                node-id (inc (.indexOf (:nodes test) node))
-               metadata-store-address-list (str "[" (str/join "," (map (fn [n] (str "http://" n ":5122")) (:nodes test))) "]")]
+               replication-factor (->>
+                                   (/ (u/restate-server-node-count opts) 2) m/floor int inc)
+               metadata-addresses (str "["
+                                       (->> (u/restate-server-nodes opts)
+                                            (map (fn [n] (str "http://" n ":5122")))
+                                            (str/join ","))
+                                       "]")]
            (c/exec
             :docker
             :run
@@ -78,10 +84,9 @@
             :--volume "/opt/config.toml:/config.toml"
             :--volume "/opt/restate/restate-data:/restate-data"
             :--env (str "RESTATE_BOOTSTRAP_NUM_PARTITIONS=" (:num-partitions opts))
-            :--env (str "RESTATE_METADATA_STORE_CLIENT__ADDRESSES=" metadata-store-address-list)
+            :--env (str "RESTATE_METADATA_STORE_CLIENT__ADDRESSES=" metadata-addresses)
             :--env (str "RESTATE_ADVERTISED_ADDRESS=http://" node ":5122")
-            :--env (str "RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_REPLICATION_PROPERTY={node: "
-                        (->> (/ (count (:nodes test)) 2) m/floor int inc) "}")
+            :--env (str "RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_REPLICATION_PROPERTY={node: " replication-factor "}")
             :--env "DO_NOT_TRACK=true"
             (:image test)
             :--node-name node-name
@@ -92,20 +97,20 @@
             ;; :--metadata-store-address metadata-store-address ;; TODO: this doesn't seem to have an effect
             ;; :--advertise-address (str "http://" node ":5122") ;; TODO: this doesn't seem to have an effect
             ))
-         (cu/await-tcp-port 9070)
+         (u/await-url "http://localhost:9070/health")
 
-         (info "Waiting for all nodes to join cluster and partitions to be configured")
-         (u/wait-for-metadata-servers (- (count (:nodes test)) (:dedicated-service-nodes opts)))
+         (info "Waiting for all nodes to join cluster and partitions to be configured...")
+         (u/wait-for-metadata-servers (u/restate-server-node-count opts))
          (u/wait-for-logs (:num-partitions opts))
          (u/wait-for-partition-leaders (:num-partitions opts))
-         (u/wait-for-partition-followers (* (:num-partitions opts) (- (dec (count (:nodes test))) (:dedicated-service-nodes opts))))
+         (u/wait-for-partition-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts))))
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")
            (when (> (:dedicated-service-nodes opts) 0) (u/await-tcp-port (last (:nodes opts)) 9080))
            (u/restate :deployments :register (app-service-url opts) :--yes))
 
-         (u/wait-for-deployment))))
+         (u/await-service-deployment))))
 
     (teardown! [_this test node]
       (when (not (:dummy? (:ssh test)))
