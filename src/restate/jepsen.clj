@@ -14,7 +14,7 @@
    [jepsen.checker.timeline :as timeline]
    [jepsen.control.util :as cu]
    [jepsen.os.debian :as debian]
-   [restate.util :as ru]
+   [restate.util :as u]
    [restate.jepsen.metadata-store-set :as mds-set]
    [restate.jepsen.metadata-store-register :as mds-register]
    [restate.jepsen.virtual-object-register :as vo-register]
@@ -29,15 +29,6 @@
 (def services-pidfile (str server-services-dir "services.pid"))
 (def services-logfile (str server-services-dir "services.log"))
 
-(defn restate-server-node?
-  "Determines whether a given node is a restate-server node."
-  [node opts] (< (.indexOf (:nodes opts) node)
-                 (- (count (:nodes opts)) (:dedicated-service-nodes opts))))
-
-(defn app-server-node?
-  "Determines whether a given node is an SDK service node."
-  [node opts] (or (= 0 (:dedicated-service-nodes opts)) (not (restate-server-node? node opts))))
-
 (defn app-service-url [opts]
   (case (:dedicated-service-nodes opts)
     ;; homogeneous deployment - all nodes run SDK services, talk to localhost
@@ -50,16 +41,13 @@
   [restate-server-setup app-server-setup]
   (reify db/DB
     (setup! [_this test node]
-      (when (app-server-node? node test)
+      (when (u/app-server-node? node test)
         (db/setup! app-server-setup test node))
-      (when (restate-server-node? node test)
+      (when (u/restate-server-node? node test)
         (db/setup! restate-server-setup test node)))
     (teardown! [_this test node]
       (db/teardown! app-server-setup test node)
       (db/teardown! restate-server-setup test node))))
-
-;;      (when (app-server-node? node test) ... )
-;;      (when (restate-server-node? node test) ... )
 
 (defn restate
   "A deployment of Restate server."
@@ -70,26 +58,11 @@
         (info node "Setting up Restate")
         (c/su
          (c/exec :apt :install :-y :docker.io :nodejs :jq)
-
-;;         (c/exec :mkdir :-p "/opt/services")
-;;         (c/upload (str resources-relative-path "/services/dist/services.zip") "/opt/services.zip")
-;;         (cu/install-archive! "file:///opt/services.zip" "/opt/services")
-;;         (c/exec :rm "/opt/services.zip")
-
          (when (:image-tarball test)
            (info node "Uploading Docker image " (:image-tarball test) "...")
            (c/upload (:image-tarball test) "/opt/restate.tar")
            (c/exec :docker :load :--input "/opt/restate.tar")
            (c/exec :docker :tag (:image test) "restate"))
-
-;;         (cu/start-daemon!
-;;          {:logfile services-logfile
-;;           :pidfile services-pidfile
-;;           :chdir   "/opt/services"}
-;;          node-binary services-args)
-;;         (cu/await-tcp-port 9080)
-
-         (c/exec :docker :rm :-f "restate")
 
          (c/upload (str resources-relative-path "/resources/restate-server.toml") "/opt/config.toml")
          (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
@@ -122,28 +95,23 @@
          (cu/await-tcp-port 9070)
 
          (info "Waiting for all nodes to join cluster and partitions to be configured")
-         (ru/wait-for-metadata-servers (- (count (:nodes test)) (:dedicated-service-nodes opts)))
-         (ru/wait-for-logs (:num-partitions opts))
-         (ru/wait-for-partition-leaders (:num-partitions opts))
-         (ru/wait-for-partition-followers (* (:num-partitions opts) (- (dec (count (:nodes test))) (:dedicated-service-nodes opts))))
+         (u/wait-for-metadata-servers (- (count (:nodes test)) (:dedicated-service-nodes opts)))
+         (u/wait-for-logs (:num-partitions opts))
+         (u/wait-for-partition-leaders (:num-partitions opts))
+         (u/wait-for-partition-followers (* (:num-partitions opts) (- (dec (count (:nodes test))) (:dedicated-service-nodes opts))))
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")
-;;           (ru/restate :deployments :register "http://host.docker.internal:9080" :--yes)
-           (ru/restate :deployments :register (app-service-url opts) :--yes))
+           (u/restate :deployments :register (app-service-url opts) :--yes))
 
-         (info "Waiting for service deployment")
-         (ru/wait-for-deployment))))
+         (u/wait-for-deployment))))
 
     (teardown! [_this test node]
       (when (not (:dummy? (:ssh test)))
         (info node "Tearing down Restate")
         (c/su
          (c/exec :rm :-rf server-restate-root)
-;;         (c/exec :rm :-rf server-services-dir)
-         (c/exec :docker :rm :-f "restate")
-;;         (cu/stop-daemon! node-binary services-pidfile)
-         )))
+         (c/exec :docker :rm :-f "restate"))))
 
     db/LogFiles (log-files [_this test _node]
                   (when (not (:dummy? (:ssh test)))
@@ -153,7 +121,7 @@
 
 (defn app-server
   "A deployment of a Restate application (= set of Restate SDK services)."
-  [opts]
+  [_opts]
   (reify db/DB
     (setup! [_db test node]
       (when (not (:dummy? (:ssh test)))
