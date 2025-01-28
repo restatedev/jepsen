@@ -102,6 +102,7 @@
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")
+           (when (> (:dedicated-service-nodes opts) 0) (u/await-tcp-port (last (:nodes opts)) 9080))
            (u/restate :deployments :register (app-service-url opts) :--yes))
 
          (u/wait-for-deployment))))
@@ -111,7 +112,7 @@
         (info node "Tearing down Restate")
         (c/su
          (c/exec :rm :-rf server-restate-root)
-         (c/exec :docker :rm :-f "restate"))))
+         (c/exec :docker :rm :-f "restate" :|| :true))))
 
     db/LogFiles (log-files [_this test _node]
                   (when (not (:dummy? (:ssh test)))

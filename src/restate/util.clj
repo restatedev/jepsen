@@ -45,6 +45,24 @@
   (-> (restate :deployments :list :| :grep "host.docker.internal:9080" :| :wc :-l)
       Integer/parseInt))
 
+(defn await-tcp-port
+  ;; copy of the built-in Jepsen one with ability to set custom host
+  "Blocks until a local TCP port is bound. Options:
+
+  :retry-interval   How long between retries, in ms. Default 1s.
+  :log-interval     How long between logging that we're still waiting, in ms.
+                    Default `retry-interval.
+  :timeout          How long until giving up and throwing :type :timeout, in
+                    ms. Default 60 seconds."
+  ([host port]
+   (await-tcp-port host port {}))
+  ([host port opts]
+   (util/await-fn
+    (fn check-port []
+      (c/exec :nc :-z host port)
+      nil)
+    (merge {:log-message (str "Waiting for port " port " ...")} opts))))
+
 (defn wait-for-deployment []
   (util/await-fn
    (fn [] (>= (get-deployments-count) 2))) ;; expecting at least Set + Register
