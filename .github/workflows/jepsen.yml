@@ -1,0 +1,60 @@
+name: Jepsen tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "github-action" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  jepsen-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Git clone the repository
+        uses: actions/checkout@v4
+
+      - name: Setup just
+        uses: extractions/setup-just@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install clojure tools
+        uses: DeLaGuardo/setup-clojure@13.0
+        with:
+          lein: 2.11.2
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
+
+      - name: Build SDK services
+        run: just make-services
+
+      - name: Create test cluster
+        run: just create-aws-cluster
+
+      - name: Run tests
+        run: |
+          lein run test \
+            --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
+            --image ghcr.io/restatedev/restate:main \
+            --workload set-vo --nemesis partition-random-node \
+            --time-limit 60 --rate 10 --concurrency 5n
+        continue-on-error: true
+
+      - name: Cleanup cluster
+        run: |
+          just destroy-aws-cluster
