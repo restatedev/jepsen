@@ -1,0 +1,22 @@
+{
+  "name": "restate-jepsen-cluster",
+  "description": "An EC2-based Restate Jepsen test cluster",
+  "scripts": {
+    "cdk": "cdk",
+    "setup": "npm run deploy && npm run get-node-info",
+    "deploy": "npx cdk deploy --outputs-file cdk-outputs.json --require-approval never",
+    "get-node-info": "./get-node-info.sh",
+    "destroy": "npx cdk destroy --force"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "20.0.0",
+    "aws-cdk": "^2.0.0",
+    "aws-cdk-lib": "^2.0.0",
+    "constructs": "^10.0.0",
+    "prettier": "^3.0.0",
+    "source-map-support": "^0.5.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  }
+}
