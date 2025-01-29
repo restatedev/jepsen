@@ -18,3 +18,7 @@ node-modules/
 /services/dist
 /services/restate-data/
 nodes.txt
+cdk.context.json
+cdk.out
+cdk-outputs.json
+*.pem
