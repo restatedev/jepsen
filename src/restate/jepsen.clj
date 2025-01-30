@@ -71,13 +71,15 @@
         (info node "Setting up Restate")
         (c/su
          (c/exec :apt :install :-y :docker.io :nodejs :jq)
+         (c/exec :mkdir :-p "/opt/services")
+
          (when (:image-tarball test)
-           (info node "Uploading Docker image " (:image-tarball test) "...")
+           (info node "Uploading Docker image" (:image-tarball test) "...")
            (c/upload (:image-tarball test) "/opt/restate.tar")
            (load-and-tag-docker-image "/opt/restate.tar" (:image test))
            (c/exec :docker :tag (:image test) "restate"))
 
-         (c/upload (str resources-relative-path "/resources/restate-server.toml") "/opt/config.toml")
+         (c/upload (str resources-relative-path "/resources/restate-server.toml") "/opt/restate/config.toml")
          (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
                node-id (inc (.indexOf (:nodes test) node))
                replication-factor (->>
@@ -94,7 +96,7 @@
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             :--add-host :host.docker.internal:host-gateway
             :--detach
-            :--volume "/opt/config.toml:/config.toml"
+            :--volume "/opt/restate/config.toml:/config.toml"
             :--volume "/opt/restate/restate-data:/restate-data"
             :--env (str "RESTATE_BOOTSTRAP_NUM_PARTITIONS=" (:num-partitions opts))
             :--env (str "RESTATE_METADATA_STORE_CLIENT__ADDRESSES=" metadata-addresses)
@@ -148,8 +150,8 @@
         (info node "Setting up services")
         (c/su
          (c/exec :apt :install :-y :docker.io :nodejs :jq)
-
          (c/exec :mkdir :-p "/opt/services")
+
          (c/upload (str resources-relative-path "/services/dist/services.zip") "/opt/services.zip")
          (cu/install-archive! "file:///opt/services.zip" "/opt/services")
          (c/exec :rm "/opt/services.zip")

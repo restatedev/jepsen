@@ -81,6 +81,10 @@ jobs:
       # TODO: restrict the cluster to only be accessible to the build worker
       #- run: curl -s https://checkip.amazonaws.com
 
+      - run: |
+          ping -c 3 ec2.us-east-1.amazonaws.com
+          ping -c 3 ec2.us-east-2.amazonaws.com
+
       - name: Create test cluster
         id: create-cluster
         run: just create-aws-cluster
