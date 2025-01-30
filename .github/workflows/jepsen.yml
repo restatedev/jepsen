@@ -70,8 +70,8 @@ jobs:
         id: jepsen-tests
         run: |
           status=0
-          for workload in ${{ inputs.workloads || 'set-mds' }}; do
-            for nemesis in ${{ inputs.nemeses || 'none' }}; do
+          for workload in ${{ inputs.workloads || 'set-vo' }}; do
+            for nemesis in ${{ inputs.nemeses || 'none partition-random-node' }}; do
               lein run test \
                 --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
                 --image ghcr.io/restatedev/restate:main \
