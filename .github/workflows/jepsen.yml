@@ -1,19 +1,20 @@
 name: Jepsen tests
 on:
-  workflow_call:
-    inputs:
-      retainCluster:
-        description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
-        required: false
-        default: true
-        type: boolean
   workflow_dispatch:
     inputs:
       retainCluster:
         description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
         required: false
-        default: true # TODO: change to false
+        default: true # TODO: change to false before merging
         type: boolean
+      workloads:
+        description: 'List of workloads to run'
+        required: false
+        type: string
+      nemeses:
+        description: 'List of nemeses to apply'
+        required: false
+        type: string
   push:
     branches: [ "main", "github-action" ]
 
@@ -24,6 +25,10 @@ permissions:
 jobs:
   jepsen-tests:
     runs-on: warp-ubuntu-latest-x64-2x
+    strategy:
+      matrix:
+        workload: ${{ fromJson(inputs.workloads || '["set-vo"]') }}
+        nemesis: ${{ fromJson(inputs.nemeses || '["none", "partition-random-node", "container-killer"]') }}
 
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +68,7 @@ jobs:
           lein run test \
             --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
             --image ghcr.io/restatedev/restate:main \
-            --workload set-vo --nemesis partition-random-node \
+            --workload ${{ matrix.workload }} --nemesis ${{ matrix.nemesis }} \
             --time-limit 60 --rate 10 --concurrency 5n --leave-db-running true
         continue-on-error: true
 
@@ -78,5 +83,7 @@ jobs:
 
       - name: Destroy cluster
         if: ${{ !inputs.retainCluster }}
-        run: |
-          just destroy-aws-cluster
+        run: just destroy-aws-cluster
+
+      - if: ${{ steps.jepsen-tests.outcome == 'failure' }}
+        run: exit 1
