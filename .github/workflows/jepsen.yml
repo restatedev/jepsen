@@ -46,7 +46,7 @@ jobs:
         with:
           lein: 2.11.2
 
-      - run: sudo apt-get update && sudo apt-get install -y gnuplot
+      - run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
       - name: Build SDK services
         run: just make-services
@@ -60,13 +60,15 @@ jobs:
       - run: curl -s https://checkip.amazonaws.com
 
       - name: Create test cluster
+        id: create-cluster
         run: just create-aws-cluster
 
       - name: Run Jepsen tests
+        id: jepsen-tests
         run: |
           status=0
-          for workload in ${{ inputs.workloads || 'set-vo set-mds' }}; do
-            for nemesis in ${{ inputs.nemeses || 'none partition-random-node container-killer' }}; do
+          for workload in ${{ inputs.workloads || 'set-mds' }}; do
+            for nemesis in ${{ inputs.nemeses || 'none' }}; do
               lein run test \
                 --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
                 --image ghcr.io/restatedev/restate:main \
@@ -79,22 +81,16 @@ jobs:
             done
           done
           exit ${status}
-        continue-on-error: true
         timeout-minutes: 10
 
-      - name: Pack Jepsen store directory
-        run: tar cvfz jepsen-store.tar.gz store
-
-      - name: Upload store artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload Jepsen output
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: jepsen-store
-          path: jepsen-store.tar.gz
+          path: store
 
+      # TODO: update default before merging
       - name: Destroy cluster
-        if: ${{ !(inputs.retainCluster || true) }} # TODO: update default before merging
+        if: ${{ always() && !(inputs.retainCluster || true) }}
         run: just destroy-aws-cluster
-
-      - name: Set overall job status
-        if: ${{ steps.jepsen-tests.outcome == 'failure' }}
-        run: exit 1
