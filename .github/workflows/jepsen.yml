@@ -6,6 +6,11 @@ on:
         description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
         required: false
         type: boolean
+      restateCommit:
+        description: 'Restate commit - we will download the Docker image produced by its CI workflow'
+        required: false
+        default: ''
+        type: string
       workloads:
         description: 'List of workloads to run'
         required: false
@@ -51,6 +56,15 @@ jobs:
 
       - name: Build SDK services
         run: just make-services
+
+      - name: Download restate snapshot from completed workflow
+        if: ${{ inputs.restateCommit != '' && github.event_name == 'workflow_dispatch' }}
+        uses: dawidd6/action-download-artifact@v8
+        with:
+          repo: restatedev/restate
+          workflow: ci.yml
+          commit: ${{ inputs.restateCommit }}
+          name: restate.tar
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
