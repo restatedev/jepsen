@@ -25,7 +25,7 @@ on:
         required: false
         type: string
   push:
-    branches: [ "main", "github-action" ]
+    branches: [ "main" ]
 
 permissions:
   id-token: write
@@ -105,7 +105,10 @@ jobs:
                 --workload ${WORKLOAD} --nemesis ${NEMESIS} \
                 ${DOCKER_IMAGE_ARGS} \
                 --time-limit 30 --rate 10 --concurrency 5n
-              if [ $? -ne 0 ]; then STATUS=1 fi
+              
+              if [ $? -ne 0 ]; then 
+                STATUS=1
+              fi
           
               echo "::endgroup::"
             done
