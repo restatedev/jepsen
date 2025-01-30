@@ -67,13 +67,13 @@ jobs:
       - name: Run Jepsen tests
         run: |
           status=0
-          for workload in ${{ inputs.workloads || 'set-vo' }}; do
+          for workload in ${{ inputs.workloads || 'set-vo set-mds' }}; do
             for nemesis in ${{ inputs.nemeses || 'none partition-random-node container-killer' }}; do
               lein run test \
                 --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
                 --image ghcr.io/restatedev/restate:main \
                 --workload ${workload} --nemesis ${nemesis} \
-                --time-limit 60 --rate 10 --concurrency 5n
+                --time-limit 30 --rate 10 --concurrency 5n
               if [ $? -ne 0 ]; then
                 echo "::error::Test failed"
                 status=1
