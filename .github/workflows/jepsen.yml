@@ -73,7 +73,7 @@ jobs:
                 --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
                 --image ghcr.io/restatedev/restate:main \
                 --workload ${workload} --nemesis ${nemesis} \
-                --time-limit 60 --rate 10 --concurrency 5n --leave-db-running true
+                --time-limit 60 --rate 10 --concurrency 5n
               if [ $? -ne 0 ]; then
                 echo "::error::Test failed"
                 status=1
@@ -94,8 +94,9 @@ jobs:
           path: jepsen-store.tar.gz
 
       - name: Destroy cluster
-        if: ${{ !inputs.retainCluster }}
+        if: ${{ !(inputs.retainCluster || true) }} # TODO: update default before merging
         run: just destroy-aws-cluster
 
-      - if: ${{ steps.jepsen-tests.outcome == 'failure' }}
+      - name: Set overall job status
+        if: ${{ steps.jepsen-tests.outcome == 'failure' }}
         run: exit 1
