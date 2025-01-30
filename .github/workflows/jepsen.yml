@@ -27,11 +27,6 @@ jobs:
     runs-on: warp-ubuntu-latest-x64-2x
 
     steps:
-      - run: |
-          curl -s https://checkip.amazonaws.com
-          ping -c 3 ec2.us-east-1.amazonaws.com
-          ping -c 3 ec2.us-east-2.amazonaws.com
-
       - uses: actions/checkout@v4
 
       - uses: extractions/setup-just@v2
@@ -58,8 +53,11 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: us-east-2
+          aws-region: us-east-1
           role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
+
+      # TODO: restrict the cluster to only be accessible to the build worker
+      - run: curl -s https://checkip.amazonaws.com
 
       - name: Create test cluster
         run: just create-aws-cluster
