@@ -5,7 +5,6 @@ on:
       retainCluster:
         description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
         required: false
-        default: true # TODO: change to false before merging
         type: boolean
       workloads:
         description: 'List of workloads to run'
@@ -93,7 +92,7 @@ jobs:
           name: jepsen-store
           path: store
 
-      # TODO: update default before merging
+      # TODO: update this to destroy by default after testing
       - name: Destroy cluster
         if: ${{ always() && !(inputs.retainCluster || true) }}
         run: just destroy-aws-cluster
