@@ -1,8 +1,21 @@
 name: Jepsen tests
 on:
+  workflow_call:
+    inputs:
+      retainCluster:
+        description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
+        required: false
+        default: true
+        type: boolean
   workflow_dispatch:
+    inputs:
+      retainCluster:
+        description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
+        required: false
+        default: true # TODO: change to false
+        type: boolean
   push:
-    branches: [ "github-action" ]
+    branches: [ "main", "github-action" ]
 
 permissions:
   id-token: write
@@ -13,11 +26,9 @@ jobs:
     runs-on: warp-ubuntu-latest-x64-2x
 
     steps:
-      - name: Git clone the repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup just
-        uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -30,14 +41,11 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@13.0
+      - uses: DeLaGuardo/setup-clojure@13.0
         with:
           lein: 2.11.2
 
-      - name: Install gnuplot
-        run: sudo apt-get update && sudo apt-get install -y gnuplot
-
+      - run: sudo apt-get update && sudo apt-get install -y gnuplot
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -50,7 +58,7 @@ jobs:
       - name: Create test cluster
         run: just create-aws-cluster
 
-      - name: Run tests
+      - name: Run Jepsen tests
         run: |
           lein run test \
             --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
@@ -59,6 +67,16 @@ jobs:
             --time-limit 60 --rate 10 --concurrency 5n --leave-db-running true
         continue-on-error: true
 
-#      - name: Destroy cluster
-#        run: |
-#          just destroy-aws-cluster
+      - name: Pack Jepsen store directory
+        run: tar cvfz jepsen-store.tar.gz store
+
+      - name: Upload store artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: jepsen-store
+          path: jepsen-store.tar.gz
+
+      - name: Destroy cluster
+        if: ${{ !inputs.retainCluster }}
+        run: |
+          just destroy-aws-cluster
