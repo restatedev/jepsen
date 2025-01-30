@@ -1,0 +1,98 @@
+name: Jepsen tests
+on:
+  workflow_dispatch:
+    inputs:
+      retainCluster:
+        description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
+        required: false
+        type: boolean
+      workloads:
+        description: 'List of workloads to run'
+        required: false
+        type: string
+      nemeses:
+        description: 'List of nemeses to apply'
+        required: false
+        type: string
+  push:
+    branches: [ "main", "github-action" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  jepsen-tests:
+    runs-on: warp-ubuntu-latest-x64-2x
+    concurrency:
+      group: singleton
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: extractions/setup-just@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: DeLaGuardo/setup-clojure@13.0
+        with:
+          lein: 2.11.2
+
+      - run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
+
+      - name: Build SDK services
+        run: just make-services
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Co-locate the cluster with WarpBuild:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
+
+      # TODO: restrict the cluster to only be accessible to the build worker
+      #- run: curl -s https://checkip.amazonaws.com
+
+      - name: Create test cluster
+        id: create-cluster
+        run: just create-aws-cluster
+
+      - name: Run Jepsen tests
+        id: jepsen-tests
+        run: |
+          status=0
+          for workload in ${{ inputs.workloads || 'set-vo' }}; do
+            for nemesis in ${{ inputs.nemeses || 'none partition-random-node' }}; do
+              lein run test \
+                --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
+                --image ghcr.io/restatedev/restate:main \
+                --workload ${workload} --nemesis ${nemesis} \
+                --time-limit 30 --rate 10 --concurrency 5n
+              if [ $? -ne 0 ]; then
+                echo "::error::Test failed"
+                status=1
+              fi
+            done
+          done
+          exit ${status}
+        timeout-minutes: 10
+
+      - name: Upload Jepsen output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jepsen-store
+          path: store
+
+      # TODO: update this to destroy by default after testing
+      - name: Destroy cluster
+        if: ${{ always() && !(inputs.retainCluster || true) }}
+        run: just destroy-aws-cluster
