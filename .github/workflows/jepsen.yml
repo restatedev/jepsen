@@ -25,6 +25,8 @@ permissions:
 jobs:
   jepsen-tests:
     runs-on: warp-ubuntu-latest-x64-2x
+    concurrency:
+      group: singleton
 
     steps:
       - uses: actions/checkout@v4
@@ -53,11 +55,12 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
+          # Co-locate the cluster with WarpBuild:
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
 
       # TODO: restrict the cluster to only be accessible to the build worker
-      - run: curl -s https://checkip.amazonaws.com
+      #- run: curl -s https://checkip.amazonaws.com
 
       - name: Create test cluster
         id: create-cluster
