@@ -22,7 +22,7 @@
 
 (def resources-relative-path ".")
 (def server-restate-root "/opt/restate/")
-(def server-logfile (str server-restate-root "/restate.log"))
+(def server-logfile (str server-restate-root "restate.log"))
 (def server-services-dir "/opt/services/")
 (def node-binary "/usr/bin/node")
 (def services-args (str server-services-dir "services.js"))
@@ -55,6 +55,12 @@
       (db/log-files app-server-setup test node)
       (db/log-files restate-server-setup test node))))
 
+(defn load-and-tag-docker-image [path image-tag]
+  (let [output   (c/exec :docker :load :--input path)
+        image-id (second (re-find #"Loaded image: (.+)" output))]
+    (c/exec :docker :tag image-id image-tag)
+    (c/exec :docker :image :ls :-a)))
+
 (defn restate
   "A deployment of Restate server."
   [opts]
@@ -68,7 +74,7 @@
          (when (:image-tarball test)
            (info node "Uploading Docker image " (:image-tarball test) "...")
            (c/upload (:image-tarball test) "/opt/restate.tar")
-           (c/exec :docker :load :--input "/opt/restate.tar")
+           (load-and-tag-docker-image "/opt/restate.tar" (:image test))
            (c/exec :docker :tag (:image test) "restate"))
 
          (c/upload (str resources-relative-path "/resources/restate-server.toml") "/opt/config.toml")

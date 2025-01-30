@@ -11,6 +11,11 @@ on:
         required: false
         default: ''
         type: string
+      restatePr:
+        description: 'Restate PR number - we will download the Docker image produced by its CI workflow'
+        required: false
+        default: ''
+        type: string
       workloads:
         description: 'List of workloads to run'
         required: false
@@ -57,13 +62,14 @@ jobs:
       - name: Build SDK services
         run: just make-services
 
-      - name: Download restate snapshot from completed workflow
-        if: ${{ inputs.restateCommit != '' && github.event_name == 'workflow_dispatch' }}
+      - name: Download Restate docker image
+        if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
         uses: dawidd6/action-download-artifact@v8
         with:
           repo: restatedev/restate
           workflow: ci.yml
           commit: ${{ inputs.restateCommit }}
+          pr: ${{ inputs.restatePr }}
           name: restate.tar
 
       - uses: aws-actions/configure-aws-credentials@v4
@@ -82,21 +88,30 @@ jobs:
       - name: Run Jepsen tests
         id: jepsen-tests
         run: |
-          status=0
-          for workload in ${{ inputs.workloads || 'set-vo' }}; do
-            for nemesis in ${{ inputs.nemeses || 'none partition-random-node' }}; do
+          if [ -f restate.tar ]; then
+            DOCKER_IMAGE_ARGS='--image localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
+          else
+            DOCKER_IMAGE_ARGS='--image ghcr.io/restatedev/restate:main'
+          fi
+          
+          STATUS=0
+          
+          for WORKLOAD in ${{ inputs.workloads || 'set-vo' }}; do
+            for NEMESIS in ${{ inputs.nemeses || 'none partition-random-node' }}; do
+              echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
+
               lein run test \
                 --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
-                --image ghcr.io/restatedev/restate:main \
-                --workload ${workload} --nemesis ${nemesis} \
+                --workload ${WORKLOAD} --nemesis ${NEMESIS} \
+                ${DOCKER_IMAGE_ARGS} \
                 --time-limit 30 --rate 10 --concurrency 5n
-              if [ $? -ne 0 ]; then
-                echo "::error::Test failed"
-                status=1
-              fi
+              if [ $? -ne 0 ]; then STATUS=1 fi
+          
+              echo "::endgroup::"
             done
           done
-          exit ${status}
+          
+          exit ${STATUS}
         timeout-minutes: 10
 
       - name: Upload Jepsen output
