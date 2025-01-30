@@ -25,12 +25,13 @@ permissions:
 jobs:
   jepsen-tests:
     runs-on: warp-ubuntu-latest-x64-2x
-    strategy:
-      matrix:
-        workload: ${{ fromJson(inputs.workloads || '["set-vo"]') }}
-        nemesis: ${{ fromJson(inputs.nemeses || '["none", "partition-random-node", "container-killer"]') }}
 
     steps:
+      - run: |
+          curl -s https://checkip.amazonaws.com
+          ping -c 3 ec2.us-east-1.amazonaws.com
+          ping -c 3 ec2.us-east-2.amazonaws.com
+
       - uses: actions/checkout@v4
 
       - uses: extractions/setup-just@v2
@@ -52,25 +53,36 @@ jobs:
 
       - run: sudo apt-get update && sudo apt-get install -y gnuplot
 
+      - name: Build SDK services
+        run: just make-services
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-2
           role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
-
-      - name: Build SDK services
-        run: just make-services
 
       - name: Create test cluster
         run: just create-aws-cluster
 
       - name: Run Jepsen tests
         run: |
-          lein run test \
-            --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
-            --image ghcr.io/restatedev/restate:main \
-            --workload ${{ matrix.workload }} --nemesis ${{ matrix.nemesis }} \
-            --time-limit 60 --rate 10 --concurrency 5n --leave-db-running true
+          status=0
+          for workload in ${{ inputs.workloads || 'set-vo' }}; do
+            for nemesis in ${{ inputs.nemeses || 'none partition-random-node container-killer' }}; do
+              lein run test \
+                --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
+                --image ghcr.io/restatedev/restate:main \
+                --workload ${workload} --nemesis ${nemesis} \
+                --time-limit 60 --rate 10 --concurrency 5n --leave-db-running true
+              if [ $? -ne 0 ]; then
+                echo "::error::Test failed"
+                status=1
+              fi
+            done
+          done
+          exit ${status}
         continue-on-error: true
+        timeout-minutes: 10
 
       - name: Pack Jepsen store directory
         run: tar cvfz jepsen-store.tar.gz store
