@@ -25,7 +25,7 @@ on:
       nemeses:
         description: 'List of space-delimited nemeses to apply'
         required: false
-        default: 'none'
+        default: 'none partition-random-node'
         type: string
       retainCluster:
         description: 'Retain the AWS worker node cluster after test'
@@ -33,6 +33,8 @@ on:
         type: boolean
   push:
     branches: [ "main" ]
+  schedule:
+    - cron: '0,30 */1 * * *'
 
 permissions:
   id-token: write
