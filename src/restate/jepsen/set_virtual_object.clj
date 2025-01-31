@@ -13,6 +13,7 @@
     [util :as u]
     [http :as hu]]
    [restate.jepsen.set-ops :refer [r w]]
+   [restate.jepsen.common :refer [with-retry]]
    [slingshot.slingshot :refer [try+]]))
 
 (defrecord
@@ -25,27 +26,31 @@
           :defaults (hu/defaults hu/client)))
 
  (setup! [this _test]
-   (info "Using service URL" (:ingress-url this))
-   (util/await-fn (fn [] (->> (hc/get (str (:ingress-url this) "/Set/" key "/get") (:defaults this))
+   (info "Using service URL" (str (:ingress-url this) "/Set/"))
+   (util/await-fn (fn [] (->> (with-retry
+                                #(hc/get (str (:ingress-url this) "/Set/" key "/get") (:defaults this)))
                               (:status)
                               (= 200))))
    (when (:dummy? (:ssh opts))
-     (hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this))))
+     (with-retry
+       #(hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this)))))
 
  (invoke! [this _test op]
    (try+
     (case (:f op)
       :read (assoc op :type :ok  :value
-                   (->> (hc/post (str (:ingress-url this) "/Set/" key "/get")
-                                 (:defaults this))
+                   (->> (with-retry
+                          #(hc/post (str (:ingress-url this) "/Set/" key "/get")
+                                    (:defaults this)))
                         (:body)
                         (json/parse-string))
                    :node (:node this))
 
       :add (do
-             (hc/post (str (:ingress-url this) "/Set/" key "/add")
-                      (merge (:defaults this)
-                             {:body (json/generate-string (:value op))}))
+             (with-retry
+               #(hc/post (str (:ingress-url this) "/Set/" key "/add")
+                         (merge (:defaults this)
+                                {:body (json/generate-string (:value op))})))
              (assoc op :type :ok :node (:node this))))
 
      ;; for Restate services, a 404 means deployment hasn't yet completed - unexpected during this phase!

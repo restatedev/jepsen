@@ -12,6 +12,7 @@
    [restate
     [util :as u]
     [http :as hu]]
+   [restate.jepsen.common :refer [with-retry]]
    [restate.jepsen.set-ops :refer [r w]]))
 
 (defrecord
@@ -36,8 +37,9 @@
     (case (:f op)
       :read (assoc op
                    :type :ok,
-                   :value (->> (hc/get (str (:endpoint this) key)
-                                       (:defaults this))
+                   :value (->> (with-retry
+                                 #(hc/get (str (:endpoint this) key)
+                                          (:defaults this)))
                                (:body)
                                (json/parse-string)
                                set)
@@ -45,19 +47,24 @@
 
       :add
       (let [[new-set stored-version]
-            (let [res (hc/get (str (:endpoint this) key)
-                              (:defaults this))]
+            (let [res
+                  (with-retry
+                    #(hc/get (str (:endpoint this) key)
+                             (:defaults this)))]
               [(conj (->> (json/parse-string (:body res)) set) (:value op))
                (parse-long (get-in res [:headers "etag"]))])]
-        (hc/put (str (:endpoint this) key)
-                (merge (:defaults this)
-                       {:body (json/generate-string new-set)
-                        :headers {"if-match" (str stored-version)
-                                  "etag" (str (inc stored-version))}}))
+        (with-retry
+          #(hc/put (str (:endpoint this) key)
+                   (merge (:defaults this)
+                          {:body (json/generate-string new-set)
+                           :headers {"if-match" (str stored-version)
+                                     "etag" (str (inc stored-version))}})))
         (assoc op :type :ok)))
     (catch [:status 412] {} (assoc op :type :fail :error :precondition-failed :node (:node this)))
     (catch java.net.http.HttpTimeoutException {} (assoc op :type :info :error :timeout :node (:node this)))
-    (catch Object {} (assoc op :type :info :error :unhandled-exception :node (:node this)))))
+    (catch Object {}
+      (info "Exception:" (:throwable &throw-context))
+      (assoc op :type :info :error :unhandled-exception :node (:node this)))))
 
  (teardown! [_ _test])
 
