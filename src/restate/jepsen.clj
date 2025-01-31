@@ -20,14 +20,14 @@
    [restate.jepsen.register-metadata-store :as register-mds]
    [restate.jepsen.register-virtual-object :as register-vo]))
 
-(def resources-relative-path ".")
-(def server-restate-root "/opt/restate/")
-(def server-logfile (str server-restate-root "/restate.log"))
-(def server-services-dir "/opt/services/")
+(def restate-root "/opt/restate/")
+(def restate-config (str restate-root "config.toml"))
+(def restate-logfile (str restate-root "restate.log"))
+(def services-root "/opt/services/")
+(def services-args (str services-root "services.js"))
+(def services-pidfile (str services-root "services.pid"))
+(def services-logfile (str services-root "services.log"))
 (def node-binary "/usr/bin/node")
-(def services-args (str server-services-dir "services.js"))
-(def services-pidfile (str server-services-dir "services.pid"))
-(def services-logfile (str server-services-dir "services.log"))
 
 (defn app-service-url [opts]
   (case (:dedicated-service-nodes opts)
@@ -42,6 +42,7 @@
   (reify
     db/DB
     (setup! [_this test node]
+      (when (not (:dummy? (:ssh test))) (c/su (c/exec :apt :install :-y :docker.io :nodejs :jq)))
       (when (u/app-server-node? node test)
         (db/setup! app-server-setup test node))
       (when (u/restate-server-node? node test)
@@ -52,8 +53,14 @@
 
     db/LogFiles
     (log-files [_this test node]
-      (db/log-files app-server-setup test node)
-      (db/log-files restate-server-setup test node))))
+      (concat (db/log-files app-server-setup test node)
+              (db/log-files restate-server-setup test node)))))
+
+(defn load-and-tag-docker-image [path image-tag]
+  (let [output   (c/exec :docker :load :--input path)
+        image-id (second (re-find #"Loaded image: (.+)" output))]
+    (c/exec :docker :tag image-id image-tag)
+    (c/exec :docker :image :ls :-a)))
 
 (defn restate
   "A deployment of Restate server."
@@ -64,14 +71,17 @@
       (when (not (:dummy? (:ssh test)))
         (info node "Setting up Restate")
         (c/su
-         (c/exec :apt :install :-y :docker.io :nodejs :jq)
+         (c/exec :mkdir :-p restate-root)
+         (c/exec :chmod 777 restate-root)
+         (c/exec :ls :-l restate-root)
+
          (when (:image-tarball test)
-           (info node "Uploading Docker image " (:image-tarball test) "...")
-           (c/upload (:image-tarball test) "/opt/restate.tar")
-           (c/exec :docker :load :--input "/opt/restate.tar")
+           (info node "Uploading Docker image" (:image-tarball test) "to" node)
+           (c/upload (:image-tarball test) "/opt/restate/restate.tar")
+           (load-and-tag-docker-image "/opt/restate/restate.tar" (:image test))
            (c/exec :docker :tag (:image test) "restate"))
 
-         (c/upload (str resources-relative-path "/resources/restate-server.toml") "/opt/config.toml")
+         (c/upload "resources/restate-server.toml" restate-config)
          (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
                node-id (inc (.indexOf (:nodes test) node))
                replication-factor (->>
@@ -88,7 +98,7 @@
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             :--add-host :host.docker.internal:host-gateway
             :--detach
-            :--volume "/opt/config.toml:/config.toml"
+            :--volume (str restate-config ":/config.toml")
             :--volume "/opt/restate/restate-data:/restate-data"
             :--env (str "RESTATE_BOOTSTRAP_NUM_PARTITIONS=" (:num-partitions opts))
             :--env (str "RESTATE_METADATA_STORE_CLIENT__ADDRESSES=" metadata-addresses)
@@ -123,15 +133,15 @@
       (when (not (:dummy? (:ssh test)))
         (info node "Tearing down Restate")
         (c/su
-         (c/exec :rm :-rf server-restate-root)
+         (c/exec :rm :-rf restate-root)
          (c/exec :docker :rm :-f "restate" :|| :true))))
 
     db/LogFiles
     (log-files [_this test _node]
       (when (not (:dummy? (:ssh test)))
-        (c/su (c/exec* "docker logs restate" "&>" server-logfile)
-              (c/exec :chmod :644 server-logfile))
-        [server-logfile services-logfile]))))
+        (c/su (c/exec* "docker logs restate" "&>" restate-logfile "|| true")
+              (c/exec :chmod :644 restate-logfile))
+        [restate-logfile]))))
 
 (defn app-server
   "A deployment of a Restate application (= set of Restate SDK services)."
@@ -141,10 +151,10 @@
       (when (not (:dummy? (:ssh test)))
         (info node "Setting up services")
         (c/su
-         (c/exec :apt :install :-y :docker.io :nodejs :jq)
-
          (c/exec :mkdir :-p "/opt/services")
-         (c/upload (str resources-relative-path "/services/dist/services.zip") "/opt/services.zip")
+         (c/exec :chmod :777 "/opt/services")
+
+         (c/upload "services/dist/services.zip" "/opt/services.zip")
          (cu/install-archive! "file:///opt/services.zip" "/opt/services")
          (c/exec :rm "/opt/services.zip")
 
@@ -160,11 +170,12 @@
         (info node "Tearing down services")
         (c/su
          (cu/stop-daemon! node-binary services-pidfile)
-         (c/exec :rm :-rf server-services-dir))))
+         (c/exec :rm :-rf services-root))))
 
-    db/LogFiles (log-files [_this test _node]
-                  (when (not (:dummy? (:ssh test)))
-                    [services-logfile]))))
+    db/LogFiles
+    (log-files [_this test _node]
+      (when (not (:dummy? (:ssh test)))
+        [services-logfile]))))
 
 (def workloads
   "A map of workloads."
