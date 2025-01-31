@@ -71,12 +71,12 @@
         (info node "Setting up Restate")
         (c/su
          (c/exec :apt :install :-y :docker.io :nodejs :jq)
-         (c/exec :mkdir :-p "/opt/services")
+         (c/exec :mkdir :-p "/opt/restate")
 
          (when (:image-tarball test)
-           (info node "Uploading Docker image" (:image-tarball test) "...")
-           (c/upload (:image-tarball test) "/opt/restate.tar")
-           (load-and-tag-docker-image "/opt/restate.tar" (:image test))
+           (info node "Uploading Docker image" (:image-tarball test) "to" node)
+           (c/upload (:image-tarball test) "/opt/restate/restate.tar")
+           (load-and-tag-docker-image "/opt/restate/restate.tar" (:image test))
            (c/exec :docker :tag (:image test) "restate"))
 
          (c/upload (str resources-relative-path "/resources/restate-server.toml") "/opt/restate/config.toml")
@@ -137,7 +137,7 @@
     db/LogFiles
     (log-files [_this test _node]
       (when (not (:dummy? (:ssh test)))
-        (c/su (c/exec* "docker logs restate" "&>" server-logfile)
+        (c/su (c/exec* "docker logs restate" "&>" server-logfile "|| true")
               (c/exec :chmod :644 server-logfile))
         [server-logfile services-logfile]))))
 
