@@ -2,10 +2,6 @@ name: Jepsen tests
 on:
   workflow_dispatch:
     inputs:
-      retainCluster:
-        description: 'Keeps the AWS Jepsen worker cluster running after the test is complete. Subsequent test runs will reuse it.'
-        required: false
-        type: boolean
       restateImageId:
         description: 'Restate Docker image to use for test'
         required: false
@@ -31,6 +27,10 @@ on:
         required: false
         default: 'none'
         type: string
+      retainCluster:
+        description: 'Retain the AWS worker node cluster after test'
+        required: false
+        type: boolean
   push:
     branches: [ "main" ]
 
