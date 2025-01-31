@@ -7,26 +7,49 @@ on:
         required: false
         default: 'ghcr.io/restatedev/restate:main'
         type: string
+
       restateCommit:
         description: 'Restate commit id - will download the Docker image artifact produced by its CI workflow'
         required: false
         default: ''
         type: string
+
       restatePr:
         description: 'Restate PR number - will download the Docker image artifact produced by its CI workflow'
         required: false
         default: ''
         type: string
+
       workloads:
         description: 'List of space-delimited workloads to run'
         required: false
         default: 'set-vo set-mds'
         type: string
+
       nemeses:
         description: 'List of space-delimited nemeses to apply'
         required: false
         default: 'none partition-random-node'
         type: string
+
+      duration:
+        description: 'Test duration per workload X nemesis combination, seconds'
+        required: false
+        default: '30'
+        type: string
+
+      rate:
+        description: 'Approximate number of requests per second, per thread'
+        required: false
+        default: '10'
+        type: string
+
+      concurrency:
+        description: 'Workers - absolute (10) or multiple of nodes (3n)'
+        required: false
+        default: '5n'
+        type: string
+
       retainCluster:
         description: 'Retain the AWS worker node cluster after test'
         required: false
@@ -34,7 +57,7 @@ on:
   push:
     branches: [ "main" ]
   schedule:
-    - cron: '0,30 */1 * * *'
+    - cron: '0 * * * *'
 
 permissions:
   id-token: write
@@ -121,7 +144,7 @@ jobs:
                 --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
                 --workload ${WORKLOAD} --nemesis ${NEMESIS} \
                 ${JEPSEN_RESTATE_IMAGE} \
-                --time-limit 30 --rate 10 --concurrency 5n \
+                --time-limit ${{ inputs.duration }} --rate ${{ inputs.rate }} --concurrency ${{ inputs.concurrency }} \
                 --leave-db-running ${{ inputs.retainCluster || 'false' }}
 
               if [ $? -ne 0 ]; then
@@ -134,7 +157,7 @@ jobs:
           done
 
           exit ${STATUS}
-        timeout-minutes: 10
+        timeout-minutes: 60
 
       - name: Upload Jepsen output
         if: always()
