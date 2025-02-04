@@ -174,7 +174,7 @@ jobs:
           done
 
           exit ${STATUS}
-        timeout-minutes: ${{ inputs.timeoutMinutes || '60' }}
+        timeout-minutes: ${{ inputs.timeoutMinutes || 60 }}
 
       - name: Upload Jepsen output
         if: always()
