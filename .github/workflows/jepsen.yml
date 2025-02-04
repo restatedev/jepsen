@@ -141,9 +141,9 @@ jobs:
         id: jepsen-tests
         run: |
           if [ -f restate.tar ]; then
-            JEPSEN_RESTATE_IMAGE='--image localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
+            JEPSEN_RESTATE_IMAGE='localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
           else
-            JEPSEN_RESTATE_IMAGE='--image ${{ inputs.restateImageId || 'ghcr.io/restatedev/restate:main' }}'
+            JEPSEN_RESTATE_IMAGE='${{ inputs.restateImageId || 'ghcr.io/restatedev/restate:main' }}'
           fi
 
           STATUS=0
@@ -153,9 +153,11 @@ jobs:
               echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
 
               lein run test \
-                --nodes-file aws/nodes.txt --username admin --ssh-privateey aws/private-key.pem \
+                --nodes-file aws/nodes.txt \
+                --username admin \
+                --ssh-private-key aws/private-key.pem \
                 --workload ${WORKLOAD} --nemesis ${NEMESIS} \
-                ${JEPSEN_RESTATE_IMAGE} \
+                --image ${JEPSEN_RESTATE_IMAGE} \
                 --time-limit ${{ inputs.duration || 60 }} \
                 --rate ${{ inputs.rate || 10 }} \
                 --concurrency ${{ inputs.concurrency || '5n' }} \
