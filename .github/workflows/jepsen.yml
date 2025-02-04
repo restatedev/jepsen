@@ -8,17 +8,17 @@ on:
         default: 'ghcr.io/restatedev/restate:main'
         type: string
 
-      restateCommit:
-        description: 'Restate commit id - will download the Docker image artifact produced by its CI workflow'
-        required: false
-        default: ''
-        type: string
-
-      restatePr:
-        description: 'Restate PR number - will download the Docker image artifact produced by its CI workflow'
-        required: false
-        default: ''
-        type: string
+#      restateCommit:
+#        description: 'Restate commit id - will download the Docker image artifact produced by its CI workflow'
+#        required: false
+#        default: ''
+#        type: string
+#
+#      restatePr:
+#        description: 'Restate PR number - will download the Docker image artifact produced by its CI workflow'
+#        required: false
+#        default: ''
+#        type: string
 
       workloads:
         description: 'List of space-delimited workloads to run'
@@ -153,7 +153,7 @@ jobs:
               echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
 
               lein run test \
-                --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
+                --nodes-file aws/nodes.txt --username admin --ssh-privateey aws/private-key.pem \
                 --workload ${WORKLOAD} --nemesis ${NEMESIS} \
                 ${JEPSEN_RESTATE_IMAGE} \
                 --time-limit ${{ inputs.duration || 60 }} \
