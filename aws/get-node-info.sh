@@ -10,5 +10,5 @@ aws ssm get-parameters \
 chmod 600 private-key.pem
 
 jq -r --arg stack_name "${STACK_NAME}" \
-    '.[$stack_name] | to_entries[] | select(.key | test("^Node")) | .value' cdk-outputs.json \
-    > nodes.txt
+  '.[$stack_name] | to_entries | sort_by(.key) | .[] | select(.key | test("^Node")) | .value' \
+  cdk-outputs.json > nodes.txt
