@@ -7,13 +7,14 @@ rocksdb-total-memory-size = "100 MB"
 
 [admin]
 heartbeat-interval = "1s"
-default-replication-strategy = "on-all-nodes"
+default-partition-replication = "everywhere"
 #log-trim-interval = "5s"
 
-[metadata-store]
-type = "raft"
+[metadata-server]
+type = "replicated"
 
-[metadata-store-client]
+[metadata-client]
+type = "native"
 #addresses = ["http://n1:5122/", "http://n2:5122/", "http://n3:5122/"]
 
 [bifrost]

@@ -1,8 +1,8 @@
 (ns restate.jepsen
   (:require
-   [clojure.tools.logging :refer [info]]
    [clojure.math :as m]
    [clojure.string :as str]
+   [clojure.tools.logging :refer [info]]
    [jepsen
     [checker :as checker]
     [cli :as cli]
@@ -14,11 +14,11 @@
    [jepsen.checker.timeline :as timeline]
    [jepsen.control.util :as cu]
    [jepsen.os.debian :as debian]
-   [restate.util :as u]
+   [restate.jepsen.register-metadata-store :as register-mds]
+   [restate.jepsen.register-virtual-object :as register-vo]
    [restate.jepsen.set-metadata-store :as set-mds]
    [restate.jepsen.set-virtual-object :as set-vo]
-   [restate.jepsen.register-metadata-store :as register-mds]
-   [restate.jepsen.register-virtual-object :as register-vo]))
+   [restate.util :as u]))
 
 (def restate-root "/opt/restate/")
 (def restate-config (str restate-root "config.toml"))
@@ -94,22 +94,22 @@
            (c/exec
             :docker
             :run
+            :--pull=always
             :--name=restate
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             :--add-host :host.docker.internal:host-gateway
             :--detach
             :--volume (str restate-config ":/config.toml")
             :--volume "/opt/restate/restate-data:/restate-data"
-            :--env (str "RESTATE_BOOTSTRAP_NUM_PARTITIONS=" (:num-partitions opts))
-            :--env (str "RESTATE_METADATA_STORE_CLIENT__ADDRESSES=" metadata-addresses)
+            :--env (str "RESTATE_DEFAULT_NUM_PARTITIONS=" (:num-partitions opts))
+            :--env (str "RESTATE_METADATA_CLIENT__ADDRESSES=" metadata-addresses)
             :--env (str "RESTATE_ADVERTISED_ADDRESS=http://" node ":5122")
-            :--env (str "RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_REPLICATION_PROPERTY={node: " replication-factor "}")
+            :--env (str "RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_LOG_REPLICATION={node: " replication-factor "}")
             :--env "DO_NOT_TRACK=true"
             (:image test)
             :--node-name node-name
             :--force-node-id node-id
-            :--allow-bootstrap (if (= node (first (:nodes test))) "true" "false")
-            :--auto-provision-partitions (if (= node (first (:nodes test))) "true" "false")
+            :--auto-provision (if (= node (first (:nodes test))) "true" "false")
             :--config-file "/config.toml"
             ;; :--metadata-store-address metadata-store-address ;; TODO: this doesn't seem to have an effect
             ;; :--advertise-address (str "http://" node ":5122") ;; TODO: this doesn't seem to have an effect

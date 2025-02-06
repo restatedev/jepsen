@@ -31,6 +31,7 @@ const instanceRole = new iam.Role(stack, "InstanceRole", {
   assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
   managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")],
 });
+const instanceProfile = new iam.InstanceProfile(stack, "InstanceProfile", { role: instanceRole });
 
 function addNodeInstance(n: number) {
   const cloudConfig = ec2.UserData.custom([`cloud_final_modules:`, `- [scripts-user, once]`].join("\n"));
@@ -49,7 +50,7 @@ function addNodeInstance(n: number) {
     machineImage: ec2.MachineImage.fromSsmParameter(
       "/aws/service/debian/release/bookworm/latest/" + instanceType.architecture.replace("x86_64", "amd64"),
     ),
-    role: instanceRole,
+    instanceProfile,
     keyPair,
     blockDevices: [
       {
