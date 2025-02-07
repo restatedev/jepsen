@@ -94,7 +94,7 @@
            (c/exec
             :docker
             :run
-            :--pull=always
+            (str "--pull=" (:image-pull-policy opts))
             :--name=restate
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             :--add-host :host.docker.internal:host-gateway
@@ -252,6 +252,8 @@
   [["-i" "--image STRING" "Restate container version"
     :default "ghcr.io/restatedev/restate:main"]
    [nil "--image-tarball STRING" "Restate container local path"]
+   [nil "--image-pull STRING" "Docker pull policy (missing | always | never)"
+    :default "missing"]
    ["-w" "--workload NAME" "Workload to run"
     :missing  (str "--workload " (cli/one-of workloads))
     :validate (workloads (cli/one-of workloads))]
