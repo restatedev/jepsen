@@ -91,7 +91,8 @@ Two principal workloads are currently available:
 These both validate linearizability based on the included Jepsen set-append checker. Fault injection strategies currently supported include:  
 
 - `none` (default)
-- `container-killer` (self-explanatory)
+- `kill-random-node` (self-explanatory)
+- `pause-random-node` (suspends a single node at a time using SIGSTOP)
 - `partition-random-node` (isolates a single node at a time)
 
 To see the full list of supported workloads and nemesis options, refer to [restate.jepsen](src/restate/jepsen.clj).

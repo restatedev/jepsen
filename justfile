@@ -20,8 +20,9 @@ destroy-aws-cluster:
   cd aws
   npm run destroy
 
-run-test workload="set-vo" nemesis="partition-random-node":
+run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restatedev/restate:main":
   lein run test --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
-    --image ghcr.io/restatedev/restate:main \
-    --time-limit 60 --rate 10 --concurrency 5n --leave-db-running true \
+    --image {{image}} \
+    --leave-db-running true \
+    --time-limit 120 --rate 10 --concurrency 5n --test-count 1 \
     --workload {{workload}} --nemesis {{nemesis}}

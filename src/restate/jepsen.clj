@@ -187,7 +187,7 @@
 (def nemeses
   "A map of nemeses."
   {"none"                  nemesis/noop
-   "container-killer"      (nemesis/node-start-stopper
+   "kill-random-node"      (nemesis/node-start-stopper
                             rand-nth
                             (fn start [_t _n]
                               (c/su (c/exec :docker :kill :-s :KILL "restate"))
@@ -195,6 +195,14 @@
                             (fn stop [_t _n]
                               (c/su (c/exec :docker :start "restate"))
                               [:restarted "restate-server"]))
+   "pause-random-node"      (nemesis/node-start-stopper
+                             rand-nth
+                             (fn start [_t _n]
+                               (c/su (c/exec :docker :kill :-s :STOP "restate"))
+                               [:paused "restate-server"])
+                             (fn stop [_t _n]
+                               (c/su (c/exec :docker :kill :-s :CONT "restate"))
+                               [:resumed "restate-server"]))
    "nuke-partition-state"  (nemesis/node-start-stopper
                             rand-nth
                             (fn start [_t _n]
@@ -232,14 +240,15 @@
                                (gen/phases
                                 (->> (:generator workload)
                                      (gen/stagger (/ (:rate opts)))
-                                     (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
-                                                          (gen/sleep 5) {:type :info, :f :stop}]))
+                                     (gen/nemesis (cycle [(gen/sleep 10) {:type :info, :f :start}
+                                                          (gen/sleep 10) {:type :info, :f :stop}]))
                                      (gen/time-limit (:time-limit opts)))
                                 (gen/log "Healing cluster")
                                 (gen/once (gen/nemesis [{:type :info, :f :stop}]))
                                 (->> (:generator workload)
                                      (gen/stagger (/ (:rate opts)))
-                                     (gen/time-limit 5))))
+                                     (gen/time-limit 10))
+                                ))
             :checker         (checker/compose
                               {:perf       (checker/perf)
                                :stats      (checker/stats)
@@ -260,7 +269,7 @@
    ["-N" "--nemesis NAME" "Nemesis to apply"
     :default "none"
     :validate (nemeses (cli/one-of nemeses))]
-   ;; By default the cluster is homegeneous - all nodes run restate-server as well as the SDK services.
+   ;; By default the cluster is homogeneous - all nodes run restate-server as well as the SDK services.
    ;; This option allows us to separate the SDK services to only run on dedicated nodes.
    [nil "--dedicated-service-nodes N" "Number of dedicated service hosting nodes."
     :default  0
