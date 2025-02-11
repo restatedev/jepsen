@@ -240,15 +240,14 @@
                                (gen/phases
                                 (->> (:generator workload)
                                      (gen/stagger (/ (:rate opts)))
-                                     (gen/nemesis (cycle [(gen/sleep 10) {:type :info, :f :start}
-                                                          (gen/sleep 10) {:type :info, :f :stop}]))
+                                     (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
+                                                          (gen/sleep 5) {:type :info, :f :stop}]))
                                      (gen/time-limit (:time-limit opts)))
                                 (gen/log "Healing cluster")
-                                (gen/once (gen/nemesis [{:type :info, :f :stop}]))
+                                (gen/once (gen/nemesis [{:type :info, :f :start}]))
                                 (->> (:generator workload)
                                      (gen/stagger (/ (:rate opts)))
-                                     (gen/time-limit 10))
-                                ))
+                                     (gen/time-limit 10))))
             :checker         (checker/compose
                               {:perf       (checker/perf)
                                :stats      (checker/stats)
