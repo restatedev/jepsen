@@ -39,19 +39,16 @@
    (try+
     (case (:f op)
       :read (assoc op :type :ok  :value
-                   (->> (with-retry
-                          #(hc/post (str (:ingress-url this) "/Set/" key "/get")
-                                    (:defaults this)))
+                   (->> (hc/post (str (:ingress-url this) "/Set/" key "/get")
+                                 (:defaults this))
                         (:body)
                         (json/parse-string))
                    :node (:node this))
 
-      :add (do
-             (with-retry
-               #(hc/post (str (:ingress-url this) "/Set/" key "/add")
-                         (merge (:defaults this)
-                                {:body (json/generate-string (:value op))})))
-             (assoc op :type :ok :node (:node this))))
+      :add (do (hc/post (str (:ingress-url this) "/Set/" key "/add")
+                        (merge (:defaults this)
+                               {:body (json/generate-string (:value op))}))
+               (assoc op :type :ok :node (:node this))))
 
      ;; for Restate services, a 404 means deployment hasn't yet completed - unexpected during this phase!
     (catch [:status 404] {} (assoc op :type :fail :error :not-found :node (:node this)))
