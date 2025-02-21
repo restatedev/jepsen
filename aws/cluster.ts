@@ -1,15 +1,15 @@
-import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
-import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as iam from "aws-cdk-lib/aws-iam";
+import { aws_ec2 as ec2, aws_iam as iam, aws_s3 as s3 } from "aws-cdk-lib";
+
+const app = new cdk.App();
 
 const controlNodeSource = process.env.CONTROL_SOURCE_CIDR ?? "0.0.0.0/0"; // source will be allowed full network access including SSH
 const nodes = 3;
 const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO);
+const bucketName = app.node.tryGetContext("snapshots-bucket-name");
 
 // --- no configuration past this point ---
 
-const app = new cdk.App();
 const stack = new cdk.Stack(app, `restate-jepsen-cluster-${process.env.ENV_SUFFIX ?? process.env.USER}`, {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
@@ -32,6 +32,17 @@ const instanceRole = new iam.Role(stack, "InstanceRole", {
   managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")],
 });
 const instanceProfile = new iam.InstanceProfile(stack, "InstanceProfile", { role: instanceRole });
+
+let bucket: s3.IBucket;
+if (bucketName) {
+  bucket = s3.Bucket.fromBucketName(stack, "Snapshots", bucketName);
+} else {
+  bucket = new s3.Bucket(stack, "Snapshots", {
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+  });
+}
+bucket.grantReadWrite(instanceRole);
+new cdk.CfnOutput(stack, `SnapshotsBucket`, { value: bucket.bucketName });
 
 function addNodeInstance(n: number) {
   const cloudConfig = ec2.UserData.custom([`cloud_final_modules:`, `- [scripts-user, once]`].join("\n"));
