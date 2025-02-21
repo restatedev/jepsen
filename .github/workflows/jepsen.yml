@@ -50,12 +50,6 @@ on:
         default: '1'
         type: string
 
-      timeoutMinutes:
-        description: 'Overall workflow timeout in minutes'
-        required: false
-        default: '60'
-        type: string
-
       # retainCluster:
       #   description: 'Retain the AWS worker node cluster after test'
       #   required: false
@@ -181,7 +175,7 @@ jobs:
           done
 
           exit ${STATUS}
-        timeout-minutes: ${{ (inputs.timeoutMinutes || 60) }}
+        timeout-minutes: 60
 
       - name: Upload Jepsen output
         if: always()
