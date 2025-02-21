@@ -3,9 +3,7 @@
   "description": "An EC2-based Restate Jepsen test cluster",
   "scripts": {
     "cdk": "cdk",
-    "setup": "npm run deploy && npm run get-node-info",
     "deploy": "npx cdk deploy --outputs-file cdk-outputs.json --require-approval never",
-    "get-node-info": "./get-node-info.sh",
     "destroy": "npx cdk destroy --force"
   },
   "devDependencies": {

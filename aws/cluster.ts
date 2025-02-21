@@ -14,7 +14,7 @@ import { aws_ec2 as ec2, aws_iam as iam, aws_s3 as s3 } from "aws-cdk-lib";
 
 const app = new cdk.App();
 
-const controlNodeSource = process.env.CONTROL_SOURCE_CIDR ?? "0.0.0.0/0"; // source will be allowed full network access including SSH
+const controlNodeSource = app.node.tryGetContext("allow-source-cidr") ?? "0.0.0.0/0";
 const nodes = 3;
 const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO);
 const bucketName = app.node.tryGetContext("snapshots-bucket-name");

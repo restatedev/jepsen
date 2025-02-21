@@ -131,9 +131,6 @@ jobs:
       - name: Prepare environment for Jepsen control node
         run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
-      # TODO: restrict the cluster to only be accessible to the build worker
-      #- run: curl -s https://checkip.amazonaws.com
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           # Co-locate the cluster with WarpBuild:
@@ -142,7 +139,9 @@ jobs:
 
       - name: Create test cluster
         id: create-cluster
-        run: just create-aws-cluster
+        run: |
+          SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
+          just create-aws-cluster "${SOURCE_IP}/32"
 
       - name: Run Jepsen tests
         id: jepsen-tests
