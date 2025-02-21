@@ -1,4 +1,4 @@
-# Jepsen tests for Restate
+# Restate Jepsen test suite
 
 This repository contains a set of Jepsen tests for validating [Restate](https://github.com/restatedev/restate) distributed operation.
 
@@ -20,11 +20,9 @@ just make-services
 
 ### Test infrastructure
 
-Cluster nodes are the nodes on which the Restate Server and application services run. There is currently no provision to create a control node; the host on which you start the Jepsen drives the cluster, and is also the client node that makes all requests to Restate, and finally performs the history analysis after test completion.  
-
 Jepsen assumes that you have a set of nodes accessible over SSH. These nodes are expected to run Debian Linux. If you already have root-level access to suitable nodes, you can specify them directly via the `--node` parameter below.
 
-The repository includes an AWS CDK stack which you can use to provision a cluster of worker nodes. By default, the cluster is open to the world - you can configure basic settings such as the control node address, instance type, and cluster size in [cluster.ts](aws/cluster.ts). You can spin up a cluster as follows:
+The repository includes an AWS CDK stack which you can use to provision a cluster of worker nodes. There is currently no provision to create a control node. The host on which you start the Jepsen tests drives requests to Restate cluster, and ultimately performs the execution history analysis. By default the cluster is open to the world - you can configure basic settings such as the control node address, instance type, and cluster size in [cluster.ts](aws/cluster.ts). You can spin up a cluster as follows:
 
 ```shell
 just create-aws-cluster
@@ -88,7 +86,7 @@ Two principal workloads are currently available:
 - `set-mds` (requires `restate-server` compiled with `metadata-api` feature)
 - `set-vo` (requires the `Set` virtual object provided in this repository)
 
-These both validate linearizability based on the included Jepsen set-append checker. Fault injection strategies currently supported include:  
+These both validate linearizability based on the included Jepsen set-append checker. Fault injection strategies currently supported include:
 
 - `none` (default)
 - `kill-random-node` (self-explanatory)
@@ -97,14 +95,14 @@ These both validate linearizability based on the included Jepsen set-append chec
 
 To see the full list of supported workloads and nemesis options, refer to [restate.jepsen](src/restate/jepsen.clj).
 
-**Note:** Jepsen's checks are focused on correctness and finding consistency violations; it's possible that a test run trivially passes because all nodes returned a service error because of a misconfiguration. 
+**Note:** Jepsen's checks are focused on correctness and finding consistency violations; it's possible that a test run trivially passes because all nodes returned a service error because of a misconfiguration.
 
 ### Local testing
 
 For rapid iteration on test workloads on your local machine, disabling SSH will skip the node setup actions. Start Restate and deploy any necessary services, then:
 
 ```shell
-lein run test --node localhost --no-ssh true --time-limit 10 --rate 10 --concurrency 10 --workload set-mds 
+lein run test --node localhost --no-ssh true --time-limit 10 --rate 10 --concurrency 10 --workload set-mds
 ```
 
-In this mode, the test assumes that you have manually set up the target environment - started `restate-server`, deployed the needed services, etc. Similarly, the tear-down phase is also ignored so local processes will be left intact after the run. 
+In this mode, the test assumes that you have manually set up the target environment - started `restate-server`, deployed the needed services, etc. Similarly, the tear-down phase is also ignored so local processes will be left intact after the run.
