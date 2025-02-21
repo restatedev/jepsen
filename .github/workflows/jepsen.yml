@@ -3,37 +3,31 @@ on:
   workflow_dispatch:
     inputs:
       restateImageId:
-        description: 'Restate Docker image to use for test'
+        description: 'Restate image (ignored if PR set)'
         required: false
         default: 'ghcr.io/restatedev/restate:main'
         type: string
 
-      # restateCommit:
-      #   description: 'Restate commit id - will download the Docker image artifact produced by its CI workflow'
-      #   required: false
-      #   default: ''
-      #   type: string
-
       restatePr:
-        description: 'Restate PR number - will download the Docker image artifact produced by its CI workflow'
+        description: 'Test PR CI Docker image artifact'
         required: false
         default: ''
         type: string
 
       workloads:
-        description: 'List of space-delimited workloads to run'
+        description: 'Workloads (space-delimited)'
         required: false
         default: 'set-vo'
         type: string
 
       nemeses:
-        description: 'List of space-delimited nemeses to apply'
+        description: 'Nemeses (space-delimited)'
         required: false
         default: 'none partition-random-node'
         type: string
 
       duration:
-        description: 'Test duration per workload X nemesis combination, seconds'
+        description: 'Duration per test, seconds'
         required: false
         default: '30'
         type: string
@@ -51,7 +45,7 @@ on:
         type: string
 
       testCount:
-        description: 'How many times should we repeat a test?'
+        description: 'Test reps'
         required: false
         default: '1'
         type: string
@@ -62,10 +56,10 @@ on:
         default: '60'
         type: string
 
-      retainCluster:
-        description: 'Retain the AWS worker node cluster after test'
-        required: false
-        type: boolean
+      # retainCluster:
+      #   description: 'Retain the AWS worker node cluster after test'
+      #   required: false
+      #   type: boolean
   push:
     branches: [ "main" ]
   schedule:
