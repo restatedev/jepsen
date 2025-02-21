@@ -3,37 +3,31 @@ on:
   workflow_dispatch:
     inputs:
       restateImageId:
-        description: 'Restate Docker image to use for test'
+        description: 'Restate image (ignored if PR set)'
         required: false
         default: 'ghcr.io/restatedev/restate:main'
         type: string
 
-      # restateCommit:
-      #   description: 'Restate commit id - will download the Docker image artifact produced by its CI workflow'
-      #   required: false
-      #   default: ''
-      #   type: string
-
       restatePr:
-        description: 'Restate PR number - will download the Docker image artifact produced by its CI workflow'
+        description: 'Test PR CI Docker image artifact'
         required: false
         default: ''
         type: string
 
       workloads:
-        description: 'List of space-delimited workloads to run'
+        description: 'Workloads (space-delimited)'
         required: false
         default: 'set-vo'
         type: string
 
       nemeses:
-        description: 'List of space-delimited nemeses to apply'
+        description: 'Nemeses (space-delimited)'
         required: false
         default: 'none partition-random-node'
         type: string
 
       duration:
-        description: 'Test duration per workload X nemesis combination, seconds'
+        description: 'Duration per test, seconds'
         required: false
         default: '30'
         type: string
@@ -51,21 +45,15 @@ on:
         type: string
 
       testCount:
-        description: 'How many times should we repeat a test?'
+        description: 'Test reps'
         required: false
         default: '1'
         type: string
 
-      timeoutMinutes:
-        description: 'Overall workflow timeout in minutes'
-        required: false
-        default: '60'
-        type: string
-
-      retainCluster:
-        description: 'Retain the AWS worker node cluster after test'
-        required: false
-        type: boolean
+      # retainCluster:
+      #   description: 'Retain the AWS worker node cluster after test'
+      #   required: false
+      #   type: boolean
   push:
     branches: [ "main" ]
   schedule:
@@ -77,7 +65,7 @@ permissions:
 
 jobs:
   jepsen-tests:
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: warp-ubuntu-latest-x64-4x
     concurrency:
       group: singleton
 
@@ -101,8 +89,6 @@ jobs:
         with:
           lein: 2.11.2
 
-      - run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
-
       - name: Build SDK services
         run: just make-services
 
@@ -120,20 +106,24 @@ jobs:
             }
       - name: Download Restate Docker image
         if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
-        uses: dawidd6/action-download-artifact@v8
+        uses: dawidd6/action-download-artifact@v3
         with:
           repo: restatedev/restate
           workflow: ci.yml
           pr: ${{ inputs.restatePr }}
           commit: ${{ inputs.restateCommit }}
           name: restate.tar
-      - name: Check Restate image is runnable
+      - name: Check downloaded Restate Docker image is runnable
         if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
         run: |
           output=$(docker load --input restate.tar)
           docker tag "${output#*: }" "localhost/restatedev/restate-commit-download:latest"
           docker image ls -a
-          docker run localhost/restatedev/restate-commit-download:latest --help
+          docker run localhost/restatedev/restate-commit-download:latest --version
+
+      # TODO: can we use snapshots to speed up the worker environment prep?
+      - name: Prepare environment for Jepsen control node
+        run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
       # TODO: restrict the cluster to only be accessible to the build worker
       #- run: curl -s https://checkip.amazonaws.com
@@ -185,7 +175,7 @@ jobs:
           done
 
           exit ${STATUS}
-        timeout-minutes: ${{ inputs.timeoutMinutes || 60 }}
+        timeout-minutes: 60
 
       - name: Upload Jepsen output
         if: always()

@@ -1,6 +1,6 @@
-cluster-name = "restate-jepsen"
-roles = ["metadata-store", "admin", "worker", "log-server"]
-log-filter = "restate_core::network::connection_manager=info,restate_ingress_http=warn,restate_worker::partition=warn,restate_invoker_impl=warn,restate=debug,raft=info"
+roles = ["admin", "metadata-server", "worker", "log-server"]
+tracing-filter = "info"
+log-filter = "restate=debug,info"
 log-format = "compact"
 log-disable-ansi-codes = true
 rocksdb-total-memory-size = "100 MB"
@@ -8,18 +8,27 @@ rocksdb-total-memory-size = "100 MB"
 [admin]
 heartbeat-interval = "1s"
 default-partition-replication = "everywhere"
-#log-trim-interval = "5s"
+log-trim-check-interval = "5s"
+log-tail-update-interval = "3s"
 
 [metadata-server]
 type = "replicated"
 
 [metadata-client]
-type = "native"
-#addresses = ["http://n1:5122/", "http://n2:5122/", "http://n3:5122/"]
+connect-timeout = "1s"
+keep-alive-interval = "1s"
+keep-alive-timeout = "1s"
 
 [bifrost]
 default-provider = "replicated"
+seal-retry-interval = "1s"
+auto-recovery-interval = "10s"
+append-retry-min-interval = "10ms"
+append-retry-max-interval = "1s"
+record-cache-memory-size = "20.0 MB"
 
-[worker.snapshots]
-#destination = "s3://restate-snapshots-afs1/restate-jepsen-snapshots"
-#snapshot-interval-num-records = 100
+[networking]
+connect-timeout = "1s"
+handshake-timeout = "1s"
+http2-keep-alive-interval = "1s"
+http2-keep-alive-timeout = "1s"
