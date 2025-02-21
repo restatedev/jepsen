@@ -1,7 +1,0 @@
-{
-  "type": "module",
-  "dependencies": {
-    "tsx": "^4.19.2",
-    "zx": "^8.3.2"
-  }
-}
