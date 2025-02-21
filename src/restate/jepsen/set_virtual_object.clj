@@ -7,7 +7,6 @@
    [hato.client :as hc]
    [jepsen [client :as client]
     [checker :as checker]
-    [history :as h]
     [generator :as gen]
     [util :as util]]
    [restate
@@ -15,8 +14,7 @@
     [http :as hu]]
    [restate.jepsen.set-ops :refer [r w]]
    [restate.jepsen.common :refer [with-retry]]
-   [slingshot.slingshot :refer [try+]]
-   [tesser.core :as t]))
+   [slingshot.slingshot :refer [try+]]))
 
 (defrecord
  SetServiceClient [key opts] client/Client

@@ -12,7 +12,6 @@
    [restate
     [util :as u]
     [http :as hu]]
-   [restate.jepsen.common :refer [with-retry]]
    [restate.jepsen.set-ops :refer [r w]]))
 
 (defrecord
@@ -37,28 +36,26 @@
     (case (:f op)
       :read (assoc op
                    :type :ok,
-                   :value (->> (with-retry
-                                 #(hc/get (str (:endpoint this) key)
-                                          (:defaults this)))
-                               (:body)
-                               (json/parse-string)
-                               set)
+                   :value (->>
+                           (hc/get (str (:endpoint this) key)
+                                   (:defaults this))
+                           (:body)
+                           (json/parse-string)
+                           set)
                    :node (:node this))
 
       :add
       (let [[new-set stored-version]
             (let [res
-                  (with-retry
-                    #(hc/get (str (:endpoint this) key)
-                             (:defaults this)))]
+                  (hc/get (str (:endpoint this) key)
+                          (:defaults this))]
               [(conj (->> (json/parse-string (:body res)) set) (:value op))
                (parse-long (get-in res [:headers "etag"]))])]
-        (with-retry
-          #(hc/put (str (:endpoint this) key)
-                   (merge (:defaults this)
-                          {:body (json/generate-string new-set)
-                           :headers {"if-match" (str stored-version)
-                                     "etag" (str (inc stored-version))}})))
+        (hc/put (str (:endpoint this) key)
+                (merge (:defaults this)
+                       {:body (json/generate-string new-set)
+                        :headers {"if-match" (str stored-version)
+                                  "etag" (str (inc stored-version))}}))
         (assoc op :type :ok)))
     (catch [:status 412] {} (assoc op :type :fail :error :precondition-failed :node (:node this)))
     (catch java.net.http.HttpTimeoutException {} (assoc op :type :info :error :timeout :node (:node this)))
