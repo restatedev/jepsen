@@ -8,17 +8,17 @@ on:
         default: 'ghcr.io/restatedev/restate:main'
         type: string
 
-#      restateCommit:
-#        description: 'Restate commit id - will download the Docker image artifact produced by its CI workflow'
-#        required: false
-#        default: ''
-#        type: string
-#
-#      restatePr:
-#        description: 'Restate PR number - will download the Docker image artifact produced by its CI workflow'
-#        required: false
-#        default: ''
-#        type: string
+      # restateCommit:
+      #   description: 'Restate commit id - will download the Docker image artifact produced by its CI workflow'
+      #   required: false
+      #   default: ''
+      #   type: string
+
+      restatePr:
+        description: 'Restate PR number - will download the Docker image artifact produced by its CI workflow'
+        required: false
+        default: ''
+        type: string
 
       workloads:
         description: 'List of space-delimited workloads to run'
@@ -106,6 +106,18 @@ jobs:
       - name: Build SDK services
         run: just make-services
 
+      # support importing oci-format restate.tar
+      - name: Set up Docker containerd snapshotter
+        if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
+        uses: crazy-max/ghaction-setup-docker@v3
+        with:
+          set-host: true
+          daemon-config: |
+            {
+              "features": {
+                "containerd-snapshotter": true
+              }
+            }
       - name: Download Restate Docker image
         if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
         uses: dawidd6/action-download-artifact@v8
@@ -115,8 +127,7 @@ jobs:
           pr: ${{ inputs.restatePr }}
           commit: ${{ inputs.restateCommit }}
           name: restate.tar
-
-      - name: Test run Restate image on build worker
+      - name: Check Restate image is runnable
         if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
         run: |
           output=$(docker load --input restate.tar)
@@ -166,7 +177,7 @@ jobs:
 
               if [ $? -ne 0 ]; then
                 STATUS=1
-                echo "::error::Test workload: ${WORKLOAD} nemesis: ${NEMESIS} failed" 
+                echo "::error::Test workload: ${WORKLOAD} nemesis: ${NEMESIS} failed"
               fi
 
               echo "::endgroup::"
