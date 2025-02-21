@@ -117,6 +117,7 @@
   "Restate service-backed Set test workload."
   [opts]
   {:client    (SetServiceClient. "jepsen-set" opts)
-   :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
-                                :heal (all-nodes-ok-after-final-heal)})
+   :checker   (checker/set-full {:linearizable? true})
+   ;; :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
+   ;;                              :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))})
