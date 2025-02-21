@@ -125,13 +125,17 @@ jobs:
           pr: ${{ inputs.restatePr }}
           commit: ${{ inputs.restateCommit }}
           name: restate.tar
-      - name: Check Restate image is runnable
+      - name: Check downloaded Restate Docker image is runnable
         if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
         run: |
           output=$(docker load --input restate.tar)
           docker tag "${output#*: }" "localhost/restatedev/restate-commit-download:latest"
           docker image ls -a
-          docker run localhost/restatedev/restate-commit-download:latest --help
+          docker run localhost/restatedev/restate-commit-download:latest --version
+
+      # TODO: can we use snapshots to speed up the worker environment prep?
+      - name: Prepare environment for Jepsen control node
+        run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
       # TODO: restrict the cluster to only be accessible to the build worker
       #- run: curl -s https://checkip.amazonaws.com
@@ -145,10 +149,6 @@ jobs:
       - name: Create test cluster
         id: create-cluster
         run: just create-aws-cluster
-
-      # TODO: can we use snapshots to speed up the worker environment prep?
-      - name: Prepare environment for Jepsen control node
-        run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
       - name: Run Jepsen tests
         id: jepsen-tests

@@ -32,7 +32,7 @@
 (defn app-service-url [opts]
   (case (:dedicated-service-nodes opts)
     ;; homogeneous deployment - all nodes run SDK services, talk to localhost
-    0 "http://host.docker.internal:9080"
+    0 "http://localhost:9080"
     ;; heterogeneous deployment - currently only a single dedicated service node supported
     (str "http://" (last (:nodes opts)) ":9080")))
 
@@ -42,7 +42,10 @@
   (reify
     db/DB
     (setup! [_this test node]
-      (when (not (:dummy? (:ssh test))) (c/su (c/exec :apt :install :-y :docker.io :nodejs :jq)))
+      (when (not (:dummy? (:ssh test)))
+        (c/su
+         (c/exec :apt :install :-y :podman :podman-docker :nodejs :jq)
+         (c/exec :touch "/etc/containers/nodocker")))
       (when (u/app-server-node? node test)
         (db/setup! app-server-setup test node))
       (when (u/restate-server-node? node test)
@@ -71,7 +74,7 @@
       (when (not (:dummy? (:ssh test)))
         (info node "Setting up Restate")
         (c/su
-         (c/exec :mkdir :-p restate-root)
+         (c/exec :mkdir :-p (str restate-root "restate-data"))
          (c/exec :chmod 777 restate-root)
          (c/exec :ls :-l restate-root)
 
@@ -97,7 +100,7 @@
             (str "--pull=" (:image-pull-policy opts))
             :--name=restate
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
-            :--add-host :host.docker.internal:host-gateway
+            ;; :--add-host :host.docker.internal:host-gateway ;; podman doesn't support this
             :--detach
             :--volume (str restate-config ":/config.toml")
             :--volume "/opt/restate/restate-data:/restate-data"
@@ -107,12 +110,11 @@
             :--env (str "RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_LOG_REPLICATION={node: " replication-factor "}")
             :--env "DO_NOT_TRACK=true"
             (:image test)
+            :--cluster-name (:cluster-name test)
             :--node-name node-name
             :--force-node-id node-id
             :--auto-provision (if (= node (first (:nodes test))) "true" "false")
             :--config-file "/config.toml"
-            ;; :--metadata-store-address metadata-store-address ;; TODO: this doesn't seem to have an effect
-            ;; :--advertise-address (str "http://" node ":5122") ;; TODO: this doesn't seem to have an effect
             ))
          (u/await-url "http://localhost:9070/health")
 
@@ -229,6 +231,9 @@
            (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
            {:pure-generators true
             :name            (str "restate-" (name (:workload opts)))
+            :cluster-name    (str "jepsen-" (.format
+                                             (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss")
+                                             (java.util.Date.)))
             :db              (cluster-setup (restate opts) (app-server opts))
             :client          (:client workload)
             :nemesis         (get nemeses (:nemesis opts))
@@ -244,7 +249,7 @@
                                                           (gen/sleep 5) {:type :info, :f :stop}]))
                                      (gen/time-limit (:time-limit opts)))
                                 (gen/log "Healing cluster")
-                                (gen/once (gen/nemesis [{:type :info, :f :start}]))
+                                (gen/once (gen/nemesis [{:type :info, :f :stop}]))
                                 (->> (:generator workload)
                                      (gen/stagger (/ (:rate opts)))
                                      (gen/time-limit 10))))
