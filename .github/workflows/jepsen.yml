@@ -9,7 +9,13 @@ on:
         type: string
 
       restatePr:
-        description: 'Test PR CI Docker image artifact'
+        description: 'Use CI Docker image from PR (ignored if commit is set)'
+        required: false
+        default: ''
+        type: string
+
+      restateCommit:
+        description: 'Use CI Docker image from Restate commit'
         required: false
         default: ''
         type: string
