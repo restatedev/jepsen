@@ -1,4 +1,4 @@
-name: Jepsen tests
+name: Run Restate Jepsen tests
 on:
   push:
     branches: [ "main" ]

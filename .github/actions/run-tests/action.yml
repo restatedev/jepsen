@@ -1,50 +1,42 @@
-name: Run Restate Jepsen tests
+name: Restate Jepsen tests
+description: "Run Restate Jepsen tests"
 inputs:
   restateImageId:
     description: 'Restate image (ignored if PR set)'
     required: false
     default: 'ghcr.io/restatedev/restate:main'
-    type: string
   restatePr:
     description: 'Use CI Docker image from PR (ignored if commit is set)'
     required: false
     default: ''
-    type: string
   restateCommit:
     description: 'Use CI Docker image from Restate commit'
     required: false
     default: ''
-    type: string
   workloads:
     description: 'Workloads (space-delimited)'
     required: false
     default: 'set-vo'
-    type: string
   nemeses:
     description: 'Nemeses (space-delimited)'
     required: false
     default: 'none partition-random-node'
-    type: string
   duration:
     description: 'Duration per test, seconds'
     required: false
     default: '30'
-    type: string
   rate:
     description: 'Approximate number of requests per second, per thread'
     required: false
     default: '10'
-    type: string
   concurrency:
     description: 'Workers - absolute (10) or multiple of nodes (3n)'
     required: false
     default: '5n'
-    type: string
   testCount:
     description: 'Test reps'
     required: false
     default: '1'
-    type: string
   # retainCluster:
   #   description: 'Retain the AWS worker node cluster after test'
   #   required: false
@@ -55,6 +47,7 @@ runs:
 
   steps:
     - run: aws sts get-caller-identity
+      shell: bash
 
     - uses: actions/checkout@v4
 
@@ -77,6 +70,7 @@ runs:
 
     - name: Build SDK services
       run: just make-services
+      shell: bash
 
     # support importing oci-format restate.tar
     - name: Set up Docker containerd snapshotter
@@ -101,6 +95,7 @@ runs:
         name: restate.tar
     - name: Check downloaded Restate Docker image is runnable
       if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
+      shell: bash
       run: |
         output=$(docker load --input restate.tar)
         docker tag "${output#*: }" "localhost/restatedev/restate-commit-download:latest"
@@ -109,6 +104,7 @@ runs:
 
     # TODO: can we use snapshots to speed up the worker environment prep?
     - name: Prepare environment for Jepsen control node
+      shell: bash
       run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
     # - uses: aws-actions/configure-aws-credentials@v4
@@ -118,6 +114,7 @@ runs:
     #     role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
 
     - name: Create test cluster
+      shell: bash
       id: create-cluster
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
@@ -125,6 +122,7 @@ runs:
 
     - name: Run Jepsen tests
       id: jepsen-tests
+      shell: bash
       run: |
         if [ -f restate.tar ]; then
           JEPSEN_RESTATE_IMAGE='localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
@@ -160,7 +158,6 @@ runs:
         done
 
         exit ${STATUS}
-      timeout-minutes: 60
 
     - name: Upload Jepsen output
       if: always()
@@ -171,5 +168,6 @@ runs:
 
     # TODO: update this to destroy by default after testing
     - name: Destroy cluster
+      shell: bash
       if: ${{ always() && !(inputs.retainCluster || true) }}
       run: just destroy-aws-cluster
