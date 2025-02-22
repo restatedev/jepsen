@@ -55,57 +55,6 @@ on:
       #   description: 'Retain the AWS worker node cluster after test'
       #   required: false
       #   type: boolean
-  workflow_call:
-    inputs:
-      restateImageId:
-        description: 'Restate image (ignored if PR set)'
-        required: false
-        default: 'ghcr.io/restatedev/restate:main'
-        type: string
-      restatePr:
-        description: 'Use CI Docker image from PR (ignored if commit is set)'
-        required: false
-        default: ''
-        type: string
-      restateCommit:
-        description: 'Use CI Docker image from Restate commit'
-        required: false
-        default: ''
-        type: string
-      workloads:
-        description: 'Workloads (space-delimited)'
-        required: false
-        default: 'set-vo'
-        type: string
-      nemeses:
-        description: 'Nemeses (space-delimited)'
-        required: false
-        default: 'none partition-random-node'
-        type: string
-      duration:
-        description: 'Duration per test, seconds'
-        required: false
-        default: '30'
-        type: string
-      rate:
-        description: 'Approximate number of requests per second, per thread'
-        required: false
-        default: '10'
-        type: string
-      concurrency:
-        description: 'Workers - absolute (10) or multiple of nodes (3n)'
-        required: false
-        default: '5n'
-        type: string
-      testCount:
-        description: 'Test reps'
-        required: false
-        default: '1'
-        type: string
-      # retainCluster:
-      #   description: 'Retain the AWS worker node cluster after test'
-      #   required: false
-      #   type: boolean
 
 permissions:
   # id-token: write
@@ -175,11 +124,11 @@ jobs:
       - name: Prepare environment for Jepsen control node
         run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
-      # - uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     # Co-locate the cluster with WarpBuild:
-      #     aws-region: us-east-1
-      #     role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Co-locate the cluster with WarpBuild:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
 
       - name: Create test cluster
         id: create-cluster
