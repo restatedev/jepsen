@@ -47,6 +47,9 @@ runs:
 
   steps:
     - uses: actions/checkout@v4
+      with:
+        repository: restatedev/jepsen
+        path: jepsen
 
     - uses: extractions/setup-just@v2
 
@@ -64,6 +67,7 @@ runs:
         lein: 2.11.2
 
     - name: Build SDK services
+      working-directory: ./jepsen
       run: just make-services
       shell: bash
 
@@ -88,9 +92,11 @@ runs:
         pr: ${{ inputs.restatePr }}
         commit: ${{ inputs.restateCommit }}
         name: restate.tar
+        path: ./jepsen
     - name: Check downloaded Restate Docker image is runnable
       if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
       shell: bash
+      working-directory: ./jepsen
       run: |
         output=$(docker load --input restate.tar)
         docker tag "${output#*: }" "localhost/restatedev/restate-commit-download:latest"
@@ -100,6 +106,7 @@ runs:
     # TODO: can we use snapshots to speed up the worker environment prep?
     - name: Prepare environment for Jepsen control node
       shell: bash
+      working-directory: ./jepsen
       run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
     - uses: aws-actions/configure-aws-credentials@v4
@@ -111,6 +118,7 @@ runs:
     - name: Create test cluster
       shell: bash
       id: create-cluster
+      working-directory: ./jepsen
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
         just create-aws-cluster "${SOURCE_IP}/32"
@@ -118,6 +126,7 @@ runs:
     - name: Run Jepsen tests
       id: jepsen-tests
       shell: bash
+      working-directory: ./jepsen
       run: |
         if [ -f restate.tar ]; then
           JEPSEN_RESTATE_IMAGE='localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
@@ -159,10 +168,11 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: jepsen-store
-        path: store
+        path: ./jepsen/store
 
     # TODO: update this to destroy by default after testing
     - name: Destroy cluster
       shell: bash
       if: ${{ always() && !(inputs.retainCluster || true) }}
+      working-directory: ./jepsen
       run: just destroy-aws-cluster
