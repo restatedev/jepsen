@@ -46,9 +46,6 @@ runs:
   using: "composite"
 
   steps:
-    - run: aws sts get-caller-identity
-      shell: bash
-
     - uses: actions/checkout@v4
 
     - uses: extractions/setup-just@v2
@@ -105,11 +102,11 @@ runs:
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
-    # - uses: aws-actions/configure-aws-credentials@v4
-    #   with:
-    #     # Co-locate the cluster with WarpBuild:
-    #     aws-region: us-east-1
-    #     role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        # Co-locate the cluster with WarpBuild:
+        aws-region: us-east-1
+        role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
 
     - name: Create test cluster
       shell: bash
