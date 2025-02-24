@@ -14,15 +14,7 @@ inputs:
   testConfig:
     description: 'JSON object containing all test parameters'
     required: false
-    default: |
-      {
-        "workloads": "set-vo",
-        "nemeses": "partition-random-node",
-        "duration": "60",
-        "rate": "10",
-        "concurrency": "5n",
-        "testCount": "1"
-      }
+    default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
   retainCluster:
     description: 'Retain the AWS worker node cluster after test'
     required: false
