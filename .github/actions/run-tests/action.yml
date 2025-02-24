@@ -8,11 +8,9 @@ inputs:
   restatePr:
     description: 'Use CI Docker image from PR (ignored if commit is set)'
     required: false
-    default: ''
   restateCommit:
     description: 'Use CI Docker image from Restate commit'
     required: false
-    default: ''
   workloads:
     description: 'Workloads (space-delimited)'
     required: false
@@ -37,10 +35,9 @@ inputs:
     description: 'Test reps'
     required: false
     default: '1'
-  # retainCluster:
-  #   description: 'Retain the AWS worker node cluster after test'
-  #   required: false
-  #   type: boolean
+  retainCluster:
+    description: 'Retain the AWS worker node cluster after test'
+    required: false
 
 runs:
   using: "composite"
