@@ -1,5 +1,10 @@
-name: Jepsen tests
+name: Run Restate Jepsen tests
 on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       restateImageId:
@@ -7,63 +12,24 @@ on:
         required: false
         default: 'ghcr.io/restatedev/restate:main'
         type: string
-
       restatePr:
         description: 'Use CI Docker image from PR (ignored if commit is set)'
         required: false
         default: ''
         type: string
-
       restateCommit:
         description: 'Use CI Docker image from Restate commit'
         required: false
         default: ''
         type: string
-
-      workloads:
-        description: 'Workloads (space-delimited)'
+      testConfig:
+        description: 'JSON object containing all test parameters'
         required: false
-        default: 'set-vo'
-        type: string
-
-      nemeses:
-        description: 'Nemeses (space-delimited)'
+        default: '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "120", "rate": "10", "concurrency": "5n", "testCount": "3" }'
+      retainCluster:
+        description: 'Retain the AWS worker node cluster after test'
         required: false
-        default: 'none partition-random-node'
-        type: string
-
-      duration:
-        description: 'Duration per test, seconds'
-        required: false
-        default: '30'
-        type: string
-
-      rate:
-        description: 'Approximate number of requests per second, per thread'
-        required: false
-        default: '10'
-        type: string
-
-      concurrency:
-        description: 'Workers - absolute (10) or multiple of nodes (3n)'
-        required: false
-        default: '5n'
-        type: string
-
-      testCount:
-        description: 'Test reps'
-        required: false
-        default: '1'
-        type: string
-
-      # retainCluster:
-      #   description: 'Retain the AWS worker node cluster after test'
-      #   required: false
-      #   type: boolean
-  push:
-    branches: [ "main" ]
-  schedule:
-    - cron: '0 0 * * *'
+        type: boolean
 
 permissions:
   id-token: write
@@ -71,125 +37,24 @@ permissions:
 
 jobs:
   jepsen-tests:
+    # id tokens are not available on forks
+    if: github.event.repository.fork == false
     runs-on: warp-ubuntu-latest-x64-4x
     concurrency:
       group: singleton
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+      with:
+        repository: restatedev/jepsen
+        sparse-checkout: |
+          .github
 
-      - uses: extractions/setup-just@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
-      - uses: DeLaGuardo/setup-clojure@13.0
-        with:
-          lein: 2.11.2
-
-      - name: Build SDK services
-        run: just make-services
-
-      # support importing oci-format restate.tar
-      - name: Set up Docker containerd snapshotter
-        if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
-        uses: crazy-max/ghaction-setup-docker@v3
-        with:
-          set-host: true
-          daemon-config: |
-            {
-              "features": {
-                "containerd-snapshotter": true
-              }
-            }
-      - name: Download Restate Docker image
-        if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
-        uses: dawidd6/action-download-artifact@v3
-        with:
-          repo: restatedev/restate
-          workflow: ci.yml
-          pr: ${{ inputs.restatePr }}
-          commit: ${{ inputs.restateCommit }}
-          name: restate.tar
-      - name: Check downloaded Restate Docker image is runnable
-        if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
-        run: |
-          output=$(docker load --input restate.tar)
-          docker tag "${output#*: }" "localhost/restatedev/restate-commit-download:latest"
-          docker image ls -a
-          docker run localhost/restatedev/restate-commit-download:latest --version
-
-      # TODO: can we use snapshots to speed up the worker environment prep?
-      - name: Prepare environment for Jepsen control node
-        run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          # Co-locate the cluster with WarpBuild:
-          aws-region: us-east-1
-          role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
-
-      - name: Create test cluster
-        id: create-cluster
-        run: |
-          SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
-          just create-aws-cluster "${SOURCE_IP}/32"
-
-      - name: Run Jepsen tests
-        id: jepsen-tests
-        run: |
-          if [ -f restate.tar ]; then
-            JEPSEN_RESTATE_IMAGE='localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
-          else
-            JEPSEN_RESTATE_IMAGE='${{ inputs.restateImageId || 'ghcr.io/restatedev/restate:main' }}'
-          fi
-
-          STATUS=0
-
-          for WORKLOAD in ${{ inputs.workloads || 'set-vo' }}; do
-            for NEMESIS in ${{ inputs.nemeses || 'none partition-random-node' }}; do
-              echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
-
-              lein run test \
-                --nodes-file aws/nodes.txt \
-                --username admin \
-                --ssh-private-key aws/private-key.pem \
-                --workload ${WORKLOAD} --nemesis ${NEMESIS} \
-                --image ${JEPSEN_RESTATE_IMAGE} \
-                --time-limit ${{ inputs.duration || 60 }} \
-                --rate ${{ inputs.rate || 10 }} \
-                --concurrency ${{ inputs.concurrency || '5n' }} \
-                --test-count ${{ inputs.testCount || 1 }} \
-                --leave-db-running ${{ inputs.retainCluster || 'false' }}
-
-              if [ $? -ne 0 ]; then
-                STATUS=1
-                echo "::error::Test workload: ${WORKLOAD} nemesis: ${NEMESIS} failed"
-              fi
-
-              echo "::endgroup::"
-            done
-          done
-
-          exit ${STATUS}
-        timeout-minutes: 60
-
-      - name: Upload Jepsen output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: jepsen-store
-          path: store
-
-      # TODO: update this to destroy by default after testing
-      - name: Destroy cluster
-        if: ${{ always() && !(inputs.retainCluster || true) }}
-        run: just destroy-aws-cluster
+    - name: Run Jepsen tests
+      uses: ./.github/actions/run-tests
+      with:
+        restateImageId: ${{ inputs.restateImageId }}
+        restatePr: ${{ inputs.restatePr }}
+        restateCommit: ${{ github.event.pull_request.head.sha || github.sha }}
+        testConfig: ${{ inputs.testConfig }}
+        retainCluster: ${{ inputs.retainCluster }}
