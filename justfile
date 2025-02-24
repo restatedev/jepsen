@@ -13,7 +13,7 @@ create-aws-cluster stack-name="" allow-source-cidr="0.0.0.0/0":
   npm run deploy -- --context stack-name={{stack-name}} --context allow-source-cidr={{allow-source-cidr}}
   bash get-node-info.sh
 
-destroy-aws-cluster:
+destroy-aws-cluster stack-name="":
   #!/usr/bin/env bash
   set -e
   cd aws
