@@ -1,6 +1,10 @@
 name: Restate Jepsen tests
 description: "Run Restate Jepsen tests"
 inputs:
+  ref:
+    description: 'Git ref to use for test suite'
+    required: false
+    default: ''
   restateImageId:
     description: 'Restate image (ignored if PR set)'
     required: false
@@ -32,8 +36,8 @@ runs:
   steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.ref }}
         repository: restatedev/jepsen
+        ref: ${{ inputs.ref }}
         path: jepsen
 
     - uses: extractions/setup-just@v2
