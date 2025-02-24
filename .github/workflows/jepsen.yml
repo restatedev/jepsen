@@ -59,7 +59,7 @@ jobs:
           .github
 
     - name: Run Jepsen tests
-      uses: .github/actions/run-tests
+      uses: ./.github/actions/run-tests
       with:
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
