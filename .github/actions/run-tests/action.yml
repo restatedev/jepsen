@@ -98,9 +98,11 @@ runs:
       run: |
         echo "::group::Install Jepsen dependencies (apt)"
         sudo apt-get update && sudo apt-get install -y gnuplot-nox
+        echo "::endgroup::"
 
         echo "::group::Fetch Clojure dependencies (lein)"
         lein deps
+        echo "::endgroup::"
 
     # TODO: can we use snapshots to speed up the worker environment prep up to this point?
 
@@ -123,6 +125,8 @@ runs:
       shell: bash
       working-directory: ./jepsen
       run: |
+        set +e
+
         if [ -f restate.tar ]; then
           JEPSEN_RESTATE_IMAGE='localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
         else
