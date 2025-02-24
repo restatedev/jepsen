@@ -12,17 +12,17 @@ inputs:
     description: 'Use CI Docker image from Restate commit'
     required: false
   testConfig:
-      description: 'JSON object containing all test parameters'
-      required: false
-      default: |
-        {
-          "workloads": "set-vo",
-          "nemeses": "partition-random-node",
-          "duration": "60",
-          "rate": "10",
-          "concurrency": "5n",
-          "testCount": "1"
-        }
+    description: 'JSON object containing all test parameters'
+    required: false
+    default: |
+      {
+        "workloads": "set-vo",
+        "nemeses": "partition-random-node",
+        "duration": "60",
+        "rate": "10",
+        "concurrency": "5n",
+        "testCount": "1"
+      }
   retainCluster:
     description: 'Retain the AWS worker node cluster after test'
     required: false
@@ -119,7 +119,7 @@ runs:
           JEPSEN_RESTATE_IMAGE='${{ inputs.restateImageId || 'ghcr.io/restatedev/restate:main' }}'
         fi
 
-        CONFIG='${{ inputs.testConfig }}'
+        CONFIG="${{ inputs.testConfig }}"
         WORKLOADS=$(echo $CONFIG | jq -r '.workloads')
         NEMESES=$(echo $CONFIG | jq -r '.nemeses')
         DURATION=$(echo $CONFIG | jq -r '.duration')
