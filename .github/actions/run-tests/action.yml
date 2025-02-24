@@ -11,30 +11,18 @@ inputs:
   restateCommit:
     description: 'Use CI Docker image from Restate commit'
     required: false
-  workloads:
-    description: 'Workloads (space-delimited)'
-    required: false
-    default: 'set-vo'
-  nemeses:
-    description: 'Nemeses (space-delimited)'
-    required: false
-    default: 'none partition-random-node'
-  duration:
-    description: 'Duration per test, seconds'
-    required: false
-    default: '30'
-  rate:
-    description: 'Approximate number of requests per second, per thread'
-    required: false
-    default: '10'
-  concurrency:
-    description: 'Workers - absolute (10) or multiple of nodes (3n)'
-    required: false
-    default: '5n'
-  testCount:
-    description: 'Test reps'
-    required: false
-    default: '1'
+  testConfig:
+      description: 'JSON object containing all test parameters'
+      required: false
+      default: |
+        {
+          "workloads": "set-vo",
+          "nemeses": "none",
+          "duration": "30",
+          "rate": "10",
+          "concurrency": "5n",
+          "testCount": "1"
+        }
   retainCluster:
     description: 'Retain the AWS worker node cluster after test'
     required: false
@@ -133,8 +121,8 @@ runs:
 
         STATUS=0
 
-        for WORKLOAD in ${{ inputs.workloads || 'set-vo' }}; do
-          for NEMESIS in ${{ inputs.nemeses || 'none partition-random-node' }}; do
+        for WORKLOAD in ${{ inputs.testConfig.workloads }}; do
+          for NEMESIS in ${{ inputs.testConfig.nemeses }}; do
             echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
 
             lein run test \
@@ -143,10 +131,10 @@ runs:
               --ssh-private-key aws/private-key.pem \
               --workload ${WORKLOAD} --nemesis ${NEMESIS} \
               --image ${JEPSEN_RESTATE_IMAGE} \
-              --time-limit ${{ inputs.duration || 60 }} \
-              --rate ${{ inputs.rate || 10 }} \
-              --concurrency ${{ inputs.concurrency || '5n' }} \
-              --test-count ${{ inputs.testCount || 1 }} \
+              --time-limit ${{ inputs.testConfig.duration }} \
+              --rate ${{ inputs.testConfig.rate }} \
+              --concurrency ${{ inputs.testConfig.concurrency }} \
+              --test-count ${{ inputs.testConfig.testCount }} \
               --leave-db-running ${{ inputs.retainCluster || 'false' }}
 
             if [ $? -ne 0 ]; then

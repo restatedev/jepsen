@@ -22,36 +22,18 @@ on:
         required: false
         default: ''
         type: string
-      workloads:
-        description: 'Workloads (space-delimited)'
-        required: false
-        default: 'set-vo'
-        type: string
-      nemeses:
-        description: 'Nemeses (space-delimited)'
-        required: false
-        default: 'none partition-random-node'
-        type: string
-      duration:
-        description: 'Duration per test, seconds'
-        required: false
-        default: '30'
-        type: string
-      rate:
-        description: 'Approximate number of requests per second, per thread'
-        required: false
-        default: '10'
-        type: string
-      concurrency:
-        description: 'Workers - absolute (10) or multiple of nodes (3n)'
-        required: false
-        default: '5n'
-        type: string
-      testCount:
-        description: 'Test reps'
-        required: false
-        default: '1'
-        type: string
+      testConfig:
+          description: 'JSON object containing all test parameters'
+          required: false
+          default: |
+            {
+              "workloads": "set-vo",
+              "nemeses": "partition-random-node",
+              "duration": "120",
+              "rate": "10",
+              "concurrency": "5n",
+              "testCount": "3"
+            }
       retainCluster:
         description: 'Retain the AWS worker node cluster after test'
         required: false
@@ -76,15 +58,11 @@ jobs:
         sparse-checkout: |
           .github
 
-    - uses: ./.github/actions/run-tests
+    - name: Run Jepsen tests
+      uses: .github/actions/run-tests
       with:
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ github.event.pull_request.head.sha || github.sha }}
-        workloads: ${{ inputs.workloads }}
-        nemeses: ${{ inputs.nemeses }}
-        duration: ${{ inputs.duration }}
-        rate: ${{ inputs.rate }}
-        concurrency: ${{ inputs.concurrency }}
-        testCount: ${{ inputs.testCount }}
+        testConfig: ${{ inputs.testConfig }}
         retainCluster: ${{ inputs.retainCluster }}
