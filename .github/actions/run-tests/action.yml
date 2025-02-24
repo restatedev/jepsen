@@ -119,18 +119,10 @@ runs:
           JEPSEN_RESTATE_IMAGE='${{ inputs.restateImageId || 'ghcr.io/restatedev/restate:main' }}'
         fi
 
-        CONFIG="${{ inputs.testConfig }}"
-        WORKLOADS=$(echo $CONFIG | jq -r '.workloads')
-        NEMESES=$(echo $CONFIG | jq -r '.nemeses')
-        DURATION=$(echo $CONFIG | jq -r '.duration')
-        RATE=$(echo $CONFIG | jq -r '.rate')
-        CONCURRENCY=$(echo $CONFIG | jq -r '.concurrency')
-        TEST_COUNT=$(echo $CONFIG | jq -r '.testCount')
-
         STATUS=0
 
-        for WORKLOAD in ${WORKLOADS}; do
-          for NEMESIS in ${NEMESES}; do
+        for WORKLOAD in ${{ inputs.testConfig.workloads }}; do
+          for NEMESIS in ${{ inputs.testConfig.nemeses }}; do
             echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
 
             lein run test \
@@ -139,10 +131,10 @@ runs:
               --ssh-private-key aws/private-key.pem \
               --workload ${WORKLOAD} --nemesis ${NEMESIS} \
               --image ${JEPSEN_RESTATE_IMAGE} \
-              --time-limit ${DURATION} \
-              --rate ${RATE} \
-              --concurrency ${CONCURRENCY} \
-              --test-count ${TEST_COUNT} \
+              --time-limit ${{ inputs.testConfig.duration }} \
+              --rate ${{ inputs.testConfig.rate }} \
+              --concurrency ${{ inputs.testConfig.concurrency }} \
+              --test-count ${{ inputs.testConfig.testCount }} \
               --leave-db-running ${{ inputs.retainCluster || 'false' }}
 
             if [ $? -ne 0 ]; then
