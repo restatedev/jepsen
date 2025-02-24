@@ -1,6 +1,10 @@
 name: Restate Jepsen tests
 description: "Run Restate Jepsen tests"
 inputs:
+  ref:
+    description: 'Git ref to use for test suite'
+    required: false
+    default: ''
   restateImageId:
     description: 'Restate image (ignored if PR set)'
     required: false
@@ -11,8 +15,15 @@ inputs:
   restateCommit:
     description: 'Use CI Docker image from Restate commit'
     required: false
+  roleArn:
+    description: 'AWS role to assume'
+    required: true
+    default: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
+  clusterName:
+    description: 'Jepsen workers cluster AWS stack name'
+    required: true
   testConfig:
-    description: 'JSON object containing all test parameters'
+    description: 'Jepsen test run configuration'
     required: false
     default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
   retainCluster:
@@ -26,6 +37,7 @@ runs:
     - uses: actions/checkout@v4
       with:
         repository: restatedev/jepsen
+        ref: ${{ inputs.ref }}
         path: jepsen
 
     - uses: extractions/setup-just@v2
@@ -80,17 +92,20 @@ runs:
         docker image ls -a
         docker run localhost/restatedev/restate-commit-download:latest --version
 
-    # TODO: can we use snapshots to speed up the worker environment prep?
     - name: Prepare environment for Jepsen control node
       shell: bash
       working-directory: ./jepsen
-      run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
+      run: |
+        sudo apt-get update && sudo apt-get install -y gnuplot-nox
+        lein deps
+
+    # TODO: can we use snapshots to speed up the worker environment prep up to this point?
 
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         # Co-locate the cluster with WarpBuild:
         aws-region: us-east-1
-        role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
+        role-to-assume: ${{ inputs.roleArn }}
 
     - name: Create test cluster
       shell: bash
@@ -98,7 +113,7 @@ runs:
       working-directory: ./jepsen
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
-        just create-aws-cluster "${SOURCE_IP}/32"
+        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32"
 
     - name: Run Jepsen tests
       id: jepsen-tests
@@ -152,4 +167,4 @@ runs:
       shell: bash
       if: ${{ always() && !(inputs.retainCluster || true) }}
       working-directory: ./jepsen
-      run: just destroy-aws-cluster
+      run: just destroy-aws-cluster "${{ inputs.clusterName }}"

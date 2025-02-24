@@ -7,18 +7,22 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Git ref for test suite"
+        required: false
+        default: 'main'
       restateImageId:
-        description: 'Restate image (ignored if PR set)'
+        description: 'Restate image (ignored if PR# set)'
         required: false
         default: 'ghcr.io/restatedev/restate:main'
         type: string
       restatePr:
-        description: 'Use CI Docker image from PR (ignored if commit is set)'
+        description: 'Use CI Docker image from PR# (ignored if commit id is set)'
         required: false
         default: ''
         type: string
       restateCommit:
-        description: 'Use CI Docker image from Restate commit'
+        description: 'Use CI Docker image from commit id'
         required: false
         default: ''
         type: string
@@ -53,8 +57,11 @@ jobs:
     - name: Run Jepsen tests
       uses: ./.github/actions/run-tests
       with:
+        ref: ${{ inputs.ref }}
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
-        restateCommit: ${{ github.event.pull_request.head.sha || github.sha }}
+        restateCommit: ${{ inputs.restateCommit }}
+        clusterName: jepsen-cluster-restatedev-jepsen
+        roleArn: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
         testConfig: ${{ inputs.testConfig }}
         retainCluster: ${{ inputs.retainCluster }}
