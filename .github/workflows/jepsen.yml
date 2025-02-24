@@ -62,13 +62,13 @@ permissions:
 
 jobs:
   jepsen-tests:
+    # id tokens are not available on forks
+    if: github.event.repository.fork
     runs-on: warp-ubuntu-latest-x64-4x
     concurrency:
       group: singleton
 
     steps:
-      - run: aws sts get-caller-identity
-
       - uses: actions/checkout@v4
 
       - uses: extractions/setup-just@v2
