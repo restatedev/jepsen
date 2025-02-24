@@ -60,20 +60,22 @@ runs:
       run: just make-services
       shell: bash
 
-    # support importing oci-format restate.tar
-    - name: Set up Docker containerd snapshotter
-      if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
-      uses: crazy-max/ghaction-setup-docker@v3
-      with:
-        set-host: true
-        daemon-config: |
-          {
-            "features": {
-              "containerd-snapshotter": true
-            }
-          }
+    - name: Prepare environment for Jepsen control node
+      shell: bash
+      working-directory: ./jepsen
+      run: |
+        echo "::group::Install Jepsen dependencies (apt)"
+        sudo apt-get update && sudo apt-get install -y gnuplot-nox
+        echo "::endgroup::"
+
+        echo "::group::Fetch Clojure dependencies (lein)"
+        lein deps
+        echo "::endgroup::"
+
+    # TODO: can we use snapshots to speed up the worker environment prep up to this point?
+
     - name: Download Restate Docker image
-      if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
+      if: inputs.restateCommit != '' || inputs.restatePr != ''
       uses: dawidd6/action-download-artifact@v3
       with:
         repo: restatedev/restate
@@ -81,28 +83,8 @@ runs:
         pr: ${{ inputs.restatePr }}
         commit: ${{ inputs.restateCommit }}
         name: restate.tar
+        workflow_conclusion: ""
         path: ./jepsen
-    - name: Check downloaded Restate Docker image is runnable
-      if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
-      shell: bash
-      working-directory: ./jepsen
-      run: |
-        output=$(docker load --input restate.tar)
-        docker tag "${output#*: }" "localhost/restatedev/restate-commit-download:latest"
-        docker image ls -a
-        docker run localhost/restatedev/restate-commit-download:latest --version
-
-    - name: Prepare environment for Jepsen control node
-      shell: bash
-      working-directory: ./jepsen
-      run: |
-        echo "::group::Install Jepsen dependencies (apt)"
-        sudo apt-get update && sudo apt-get install -y gnuplot-nox
-
-        echo "::group::Fetch Clojure dependencies (lein)"
-        lein deps
-
-    # TODO: can we use snapshots to speed up the worker environment prep up to this point?
 
     - uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -123,6 +105,8 @@ runs:
       shell: bash
       working-directory: ./jepsen
       run: |
+        set +e
+
         if [ -f restate.tar ]; then
           JEPSEN_RESTATE_IMAGE='localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
         else
