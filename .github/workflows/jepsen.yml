@@ -56,5 +56,6 @@ jobs:
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ github.event.pull_request.head.sha || github.sha }}
+        clusterName: restatedev_jepsen
         testConfig: ${{ inputs.testConfig }}
         retainCluster: ${{ inputs.retainCluster }}

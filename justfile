@@ -1,18 +1,21 @@
 make-services:
   #!/usr/bin/env bash
+  set -e
   cd services
   npm clean-install
   npm run bundle
 
-create-aws-cluster allow-source-cidr="0.0.0.0/0":
+create-aws-cluster allow-source-cidr="0.0.0.0/0" stack-name="":
   #!/usr/bin/env bash
+  set -e
   cd aws
   npm clean-install
-  npm run deploy -- --context allow-source-cidr={{allow-source-cidr}}
+  npm run deploy -- --context allow-source-cidr={{allow-source-cidr}} --context stack-name={{stack-name}}
   bash get-node-info.sh
 
 destroy-aws-cluster:
   #!/usr/bin/env bash
+  set -e
   cd aws
   npm run destroy
 

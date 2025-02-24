@@ -18,10 +18,12 @@ const controlNodeSource = app.node.tryGetContext("allow-source-cidr") ?? "0.0.0.
 const nodes = 3;
 const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO);
 const bucketName = app.node.tryGetContext("snapshots-bucket-name");
+const stackName =
+  app.node.tryGetContext("stack-name") || `restate-jepsen-cluster-${process.env.ENV_SUFFIX ?? process.env.USER}`;
 
 // --- no configuration past this point ---
 
-const stack = new cdk.Stack(app, `restate-jepsen-cluster-${process.env.ENV_SUFFIX ?? process.env.USER}`, {
+const stack = new cdk.Stack(app, stackName, {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION,

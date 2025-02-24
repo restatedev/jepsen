@@ -11,6 +11,9 @@ inputs:
   restateCommit:
     description: 'Use CI Docker image from Restate commit'
     required: false
+  clusterName:
+    description: 'Jepsen workers cluster AWS stack name'
+    required: false
   testConfig:
     description: 'JSON object containing all test parameters'
     required: false
@@ -80,11 +83,14 @@ runs:
         docker image ls -a
         docker run localhost/restatedev/restate-commit-download:latest --version
 
-    # TODO: can we use snapshots to speed up the worker environment prep?
     - name: Prepare environment for Jepsen control node
       shell: bash
       working-directory: ./jepsen
-      run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
+      run: |
+        sudo apt-get update && sudo apt-get install -y gnuplot-nox
+        lein deps
+
+    # TODO: can we use snapshots to speed up the worker environment prep up to this point?
 
     - uses: aws-actions/configure-aws-credentials@v4
       with:
