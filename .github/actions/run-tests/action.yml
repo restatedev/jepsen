@@ -121,8 +121,8 @@ runs:
 
         STATUS=0
 
-        for WORKLOAD in ${{ inputs.testConfig.workloads }}; do
-          for NEMESIS in ${{ inputs.testConfig.nemeses }}; do
+        for WORKLOAD in ${{ inputs.testConfig.workloads || 'set-vo' }}; do
+          for NEMESIS in ${{ inputs.testConfig.nemeses || 'partition-random-node' }}; do
             echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
 
             lein run test \
@@ -131,10 +131,10 @@ runs:
               --ssh-private-key aws/private-key.pem \
               --workload ${WORKLOAD} --nemesis ${NEMESIS} \
               --image ${JEPSEN_RESTATE_IMAGE} \
-              --time-limit ${{ inputs.testConfig.duration }} \
-              --rate ${{ inputs.testConfig.rate }} \
-              --concurrency ${{ inputs.testConfig.concurrency }} \
-              --test-count ${{ inputs.testConfig.testCount }} \
+              --time-limit ${{ inputs.testConfig.duration || 30 }} \
+              --rate ${{ inputs.testConfig.rate || 10 }} \
+              --concurrency ${{ inputs.testConfig.concurrency || '5n' }} \
+              --test-count ${{ inputs.testConfig.testCount || '1' }} \
               --leave-db-running ${{ inputs.retainCluster || 'false' }}
 
             if [ $? -ne 0 ]; then
