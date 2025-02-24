@@ -39,7 +39,9 @@ const securityGroup = new ec2.SecurityGroup(stack, "SecurityGroup", {
 securityGroup.addIngressRule(securityGroup, ec2.Port.allTraffic());
 securityGroup.addIngressRule(ec2.Peer.ipv4(controlNodeSource), ec2.Port.allTraffic());
 
-const keyPair = new ec2.KeyPair(stack, "SshKeypair");
+const keyPair = new ec2.KeyPair(stack, "SshKeypair", {
+  keyPairName: `${stackName}/ec2-keypair`,
+});
 const instanceRole = new iam.Role(stack, "InstanceRole", {
   assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
   managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")],
