@@ -73,7 +73,6 @@ jobs:
     - uses: actions/checkout@v4
       with:
         repository: restatedev/jepsen
-        path: jepsen
         sparse-checkout: |
           .github
 
