@@ -96,7 +96,10 @@ runs:
       shell: bash
       working-directory: ./jepsen
       run: |
+        echo "::group::Install Jepsen dependencies (apt)"
         sudo apt-get update && sudo apt-get install -y gnuplot-nox
+
+        echo "::group::Fetch Clojure dependencies (lein)"
         lein deps
 
     # TODO: can we use snapshots to speed up the worker environment prep up to this point?
@@ -128,8 +131,8 @@ runs:
 
         STATUS=0
 
-        for WORKLOAD in ${{ inputs.testConfig.workloads || 'set-vo' }}; do
-          for NEMESIS in ${{ inputs.testConfig.nemeses || 'partition-random-node' }}; do
+        for WORKLOAD in ${{ fromJSON(inputs.testConfig).workloads || 'set-vo' }}; do
+          for NEMESIS in ${{ fromJSON(inputs.testConfig).nemeses || 'partition-random-node' }}; do
             echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
 
             lein run test \
@@ -138,10 +141,10 @@ runs:
               --ssh-private-key aws/private-key.pem \
               --workload ${WORKLOAD} --nemesis ${NEMESIS} \
               --image ${JEPSEN_RESTATE_IMAGE} \
-              --time-limit ${{ inputs.testConfig.duration || 30 }} \
-              --rate ${{ inputs.testConfig.rate || 10 }} \
-              --concurrency ${{ inputs.testConfig.concurrency || '5n' }} \
-              --test-count ${{ inputs.testConfig.testCount || '1' }} \
+              --time-limit ${{ fromJSON(inputs.testConfig).duration || 30 }} \
+              --rate ${{ fromJSON(inputs.testConfig).rate || 10 }} \
+              --concurrency ${{ fromJSON(inputs.testConfig).concurrency || '5n' }} \
+              --test-count ${{ fromJSON(inputs.testConfig).testCount || '1' }} \
               --leave-db-running ${{ inputs.retainCluster || 'false' }}
 
             if [ $? -ne 0 ]; then
