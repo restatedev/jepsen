@@ -39,9 +39,7 @@ const securityGroup = new ec2.SecurityGroup(stack, "SecurityGroup", {
 securityGroup.addIngressRule(securityGroup, ec2.Port.allTraffic());
 securityGroup.addIngressRule(ec2.Peer.ipv4(controlNodeSource), ec2.Port.allTraffic());
 
-const keyPair = new ec2.KeyPair(stack, "SshKeypair", {
-  keyPairName: `${stackName}/ec2-keypair`,
-});
+const keyPair = new ec2.KeyPair(stack, "SshKeypair");
 const instanceRole = new iam.Role(stack, "InstanceRole", {
   assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
   managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")],
@@ -97,3 +95,6 @@ for (let n = 1; n <= nodes; n++) {
 }
 
 new cdk.CfnOutput(stack, "KeyArn", { value: keyPair.privateKey.parameterArn });
+
+cdk.Tags.of(stack).add("purpose", "jepsen-tests");
+cdk.Tags.of(stack).add("stack", stackName);
