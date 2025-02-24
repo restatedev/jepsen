@@ -11,11 +11,15 @@ inputs:
   restateCommit:
     description: 'Use CI Docker image from Restate commit'
     required: false
+  roleArn:
+    description: 'AWS role to assume'
+    required: true
+    default: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
   clusterName:
     description: 'Jepsen workers cluster AWS stack name'
-    required: false
+    required: true
   testConfig:
-    description: 'JSON object containing all test parameters'
+    description: 'Jepsen test run configuration'
     required: false
     default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
   retainCluster:
@@ -96,7 +100,7 @@ runs:
       with:
         # Co-locate the cluster with WarpBuild:
         aws-region: us-east-1
-        role-to-assume: arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role
+        role-to-assume: ${{ inputs.roleArn }}
 
     - name: Create test cluster
       shell: bash
@@ -104,7 +108,7 @@ runs:
       working-directory: ./jepsen
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
-        just create-aws-cluster "{{ inputs.clusterName }}" "${SOURCE_IP}/32"
+        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32"
 
     - name: Run Jepsen tests
       id: jepsen-tests
@@ -158,4 +162,4 @@ runs:
       shell: bash
       if: ${{ always() && !(inputs.retainCluster || true) }}
       working-directory: ./jepsen
-      run: just destroy-aws-cluster "{{ inputs.clusterName }}"
+      run: just destroy-aws-cluster "${{ inputs.clusterName }}"

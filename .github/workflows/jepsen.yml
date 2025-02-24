@@ -57,5 +57,6 @@ jobs:
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ github.event.pull_request.head.sha || github.sha }}
         clusterName: restatedev_jepsen
+        roleArn: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
         testConfig: ${{ inputs.testConfig }}
         retainCluster: ${{ inputs.retainCluster }}
