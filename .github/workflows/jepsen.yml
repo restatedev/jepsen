@@ -60,7 +60,7 @@ jobs:
         ref: ${{ inputs.ref }}
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
-        restateCommit: ${{ inputs.restateCommit }}
+        restateCommit: ${{ inputs.restateCommit || '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "120", "rate": "10", "concurrency": "5n", "testCount": "3" }' }}
         clusterName: jepsen-cluster-restatedev-jepsen
         roleArn: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
         testConfig: ${{ inputs.testConfig }}
