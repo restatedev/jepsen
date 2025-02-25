@@ -62,7 +62,7 @@ runs:
 
     # support importing oci-format restate.tar
     - name: Set up Docker containerd snapshotter
-      if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
+      if: inputs.restateCommit != '' || inputs.restatePr != ''
       uses: crazy-max/ghaction-setup-docker@v3
       with:
         set-host: true
@@ -73,7 +73,7 @@ runs:
             }
           }
     - name: Download Restate Docker image
-      if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
+      if: inputs.restateCommit != '' || inputs.restatePr != ''
       uses: dawidd6/action-download-artifact@v3
       with:
         repo: restatedev/restate
@@ -83,7 +83,7 @@ runs:
         name: restate.tar
         path: ./jepsen
     - name: Check downloaded Restate Docker image is runnable
-      if: ${{ (inputs.restateCommit != '' || inputs.restatePr != '') && github.event_name == 'workflow_dispatch' }}
+      if: inputs.restateCommit != '' || inputs.restatePr != ''
       shell: bash
       working-directory: ./jepsen
       run: |
