@@ -261,7 +261,7 @@
                                 (gen/once (gen/nemesis [{:type :info, :f :stop}]))
                                 (->> (:generator workload)
                                      (gen/stagger (/ (:rate opts)))
-                                     (gen/time-limit 10))))
+                                     (gen/time-limit 20))))
             :checker         (checker/compose
                               {:perf       (checker/perf)
                                :stats      (checker/stats)
