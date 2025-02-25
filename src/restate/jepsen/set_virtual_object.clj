@@ -23,6 +23,7 @@
     [http :as hu]]
    [restate.jepsen.set-ops :refer [r w]]
    [restate.jepsen.common :refer [with-retry]]
+   [restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
    [slingshot.slingshot :refer [try+]]))
 
 (defrecord
@@ -72,58 +73,11 @@
 
  (close! [_ _test]))
 
-(defn latest-nemesis-stop [history]
-  (->> history
-       (filter #(and (= :nemesis (:process %))
-                     (= :stop (:f %))))
-       last))
-
-(defn events-after [history event]
-  (if (nil? event)
-    history
-    (drop-while #(not= % event) history)))
-
-(defn last-n-events-per-node [history n]
-  (->> history
-       (group-by :node)
-       (map (fn [[node events]]
-              [node (take-last n events)]))))
-
-(defn contains-error? [events]
-  (some #(and (= :info (:type %))
-              (contains? % :error))
-        events))
-
-(defn check-nodes [history n]
-  (let [nemesis-stop (latest-nemesis-stop history)
-        events-after-stop (events-after history nemesis-stop)]
-    (->> (last-n-events-per-node events-after-stop n)
-         (filter (fn [[_node events]]
-                   (contains-error? events)))
-         (map first) ; Get the node from each [node events] pair
-         (filter some?)
-         (into #{}))))
-
-(defn all-nodes-ok-after-final-heal []
-  (reify checker/Checker
-    (check [_this _test history _opts]
-      (let [nodes-with-errors (check-nodes history 10)]
-        (if (seq nodes-with-errors)
-          {:valid? false
-           :errors (map (fn [node]
-                          {:node node
-                           :events (->> (last-n-events-per-node
-                                         (events-after history (latest-nemesis-stop history)) 3)
-                                        (filter #(= (first %) node))
-                                        first
-                                        second)})
-                        nodes-with-errors)}
-          {:valid? true})))))
-
 (defn workload
   "Restate service-backed Set test workload."
   [opts]
   {:client    (SetServiceClient. "jepsen-set" opts)
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
                                 :heal (all-nodes-ok-after-final-heal)})
-   :generator (gen/reserve 5 (repeat (r)) (w))})
+   :generator (gen/reserve 5 (repeat (r)) (w))
+   :heal-time 20})

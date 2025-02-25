@@ -11,17 +11,18 @@
   "A set client backed by the Restate Metadata Store HTTP API.
   Note: restate-server must be compiled with the metadata-api feature."
   (:require
+   [cheshire.core :as json]
    [clojure.tools.logging :refer [info]]
+   [hato.client :as hc]
    [jepsen [client :as client]
     [checker :as checker]
     [generator :as gen]]
-   [hato.client :as hc]
-   [cheshire.core :as json]
-   [slingshot.slingshot :refer [try+]]
    [restate
     [util :as u]
     [http :as hu]]
-   [restate.jepsen.set-ops :refer [r w]]))
+   [restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
+   [restate.jepsen.set-ops :refer [r w]]
+   [slingshot.slingshot :refer [try+]]))
 
 (defrecord
  SetMetadatsStoreClient [key opts] client/Client
@@ -80,5 +81,7 @@
   "Restate Metadata Store-backed Set test workload."
   [opts]
   {:client    (SetMetadatsStoreClient. "jepsen-set" opts)
-   :checker   (checker/set-full {:linearizable? true})
-   :generator (gen/reserve 5 (repeat (r)) (w))})
+   :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
+                                :heal (all-nodes-ok-after-final-heal)})
+   :generator (gen/reserve 5 (repeat (r)) (w))
+   :heal-time 20})
