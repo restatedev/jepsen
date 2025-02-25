@@ -123,8 +123,7 @@
             :--node-name node-name
             :--force-node-id node-id
             :--auto-provision (if (= node (first (:nodes test))) "true" "false")
-            :--config-file "/config.toml"
-            ))
+            :--config-file "/config.toml"))
          (u/await-url "http://localhost:9070/health")
 
          (info "Waiting for all nodes to join cluster and partitions to be configured...")
@@ -246,7 +245,9 @@
             :db              (cluster-setup (restate opts) (app-server opts))
             :client          (:client workload)
             :nemesis         (get nemeses (:nemesis opts))
-            :generator       (if (= (:nemesis opts) "none")
+            :generator       (if (or
+                                  (= (:nemesis opts) "none")
+                                  (nil? (:heal-time workload)))
                                (->> (:generator workload)
                                     (gen/stagger (/ (:rate opts)))
                                     (gen/time-limit (:time-limit opts))
@@ -259,9 +260,10 @@
                                      (gen/time-limit (:time-limit opts)))
                                 (gen/log "Healing cluster")
                                 (gen/once (gen/nemesis [{:type :info, :f :stop}]))
+                                (gen/log "Running post-heal workload")
                                 (->> (:generator workload)
                                      (gen/stagger (/ (:rate opts)))
-                                     (gen/time-limit 20))))
+                                     (gen/time-limit (:heal-time workload)))))
             :checker         (checker/compose
                               {:perf       (checker/perf)
                                :stats      (checker/stats)
