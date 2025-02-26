@@ -74,6 +74,11 @@
     (c/exec :docker :tag image-id image-tag)
     (c/exec :docker :image :ls :-a)))
 
+(defn docker-env
+  "Turns a map into a sequence of Docker command line --env arguments"
+  [env]
+  (mapcat (fn [[k v]] ["--env" (str (name k) "=" v)]) env))
+
 (defn restate
   "A deployment of Restate server."
   [opts]
@@ -93,7 +98,7 @@
            (load-and-tag-docker-image "/opt/restate/restate.tar" (:image test))
            (c/exec :docker :tag (:image test) "restate"))
 
-         (c/upload "resources/restate-server.toml" restate-config)
+         (c/upload (str "resources/" (:restate-config-toml test)) restate-config)
          (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
                node-id (inc (.indexOf (:nodes test) node))
                replication-factor (->>
@@ -113,11 +118,12 @@
             :--detach
             :--volume (str restate-config ":/config.toml")
             :--volume "/opt/restate/restate-data:/restate-data"
-            :--env (str "RESTATE_DEFAULT_NUM_PARTITIONS=" (:num-partitions opts))
-            :--env (str "RESTATE_METADATA_CLIENT__ADDRESSES=" metadata-addresses)
-            :--env (str "RESTATE_ADVERTISED_ADDRESS=http://" node ":5122")
-            :--env (str "RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_LOG_REPLICATION={node: " replication-factor "}")
-            :--env "DO_NOT_TRACK=true"
+            (docker-env (merge {:RESTATE_DEFAULT_NUM_PARTITIONS (:num-partitions opts)
+                                :RESTATE_METADATA_CLIENT__ADDRESSES metadata-addresses
+                                :RESTATE_ADVERTISED_ADDRESS (str "http://" node ":5122")
+                                :RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_LOG_REPLICATION (str "{node: " replication-factor "}")
+                                :DO_NOT_TRACK "true"}
+                               (:additional-env test)))
             (:image test)
             :--cluster-name (:cluster-name test)
             :--node-name node-name
@@ -127,8 +133,8 @@
          (u/await-url "http://localhost:9070/health")
 
          (info "Waiting for all nodes to join cluster and partitions to be configured...")
-         (u/wait-for-metadata-servers (u/restate-server-node-count opts))
-         (u/wait-for-logs (:num-partitions opts))
+         ;; (u/wait-for-metadata-servers (u/restate-server-node-count opts))
+         ;; (u/wait-for-logs (:num-partitions opts))
          (u/wait-for-partition-leaders (:num-partitions opts))
          (u/wait-for-partition-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts))))
 
@@ -190,6 +196,7 @@
 (def workloads
   "A map of workloads."
   {"set-mds"      set-mds/workload
+   "set-mds-s3"   set-mds/workload-s3
    "set-vo"       set-vo/workload
    "register-mds" register-mds/workload
    "register-vo"  register-vo/workload})
@@ -236,6 +243,8 @@
   (let [workload ((get workloads (:workload opts)) opts)]
     (merge tests/noop-test
            opts
+           {:restate-config-toml "restate-server.toml"}
+           (:workload-opts workload)
            (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
            {:pure-generators true
             :name            (str "restate-" (name (:workload opts)))
@@ -284,6 +293,7 @@
    ["-N" "--nemesis NAME" "Nemesis to apply"
     :default "none"
     :validate (nemeses (cli/one-of nemeses))]
+   [nil "--metadata-bucket NAME" "[Optional] Bucket to use for object-store metadata backend"]
    ;; By default the cluster is homogeneous - all nodes run restate-server as well as the SDK services.
    ;; This option allows us to separate the SDK services to only run on dedicated nodes.
    [nil "--dedicated-service-nodes N" "Number of dedicated service hosting nodes."
