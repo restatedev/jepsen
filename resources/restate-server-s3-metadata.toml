@@ -1,0 +1,36 @@
+roles = ["admin", "worker", "log-server"]
+tracing-filter = "info"
+log-filter = "restate=debug,info"
+log-format = "compact"
+log-disable-ansi-codes = true
+rocksdb-total-memory-size = "100 MB"
+
+[admin]
+heartbeat-interval = "1s"
+default-partition-replication = "everywhere"
+log-trim-check-interval = "5s"
+log-tail-update-interval = "3s"
+
+[metadata-server]
+type = "replicated"
+
+[metadata-client]
+type = "object-store"
+bucket = "<metadata-bucket>" # set via environment
+
+[metadata-client.credentials]
+type = "aws-env"
+
+[bifrost]
+default-provider = "replicated"
+seal-retry-interval = "1s"
+auto-recovery-interval = "10s"
+append-retry-min-interval = "10ms"
+append-retry-max-interval = "1s"
+record-cache-memory-size = "20.0 MB"
+
+[networking]
+connect-timeout = "1s"
+handshake-timeout = "1s"
+http2-keep-alive-interval = "1s"
+http2-keep-alive-timeout = "1s"

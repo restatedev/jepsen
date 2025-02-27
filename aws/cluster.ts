@@ -14,12 +14,15 @@ import { aws_ec2 as ec2, aws_iam as iam, aws_s3 as s3 } from "aws-cdk-lib";
 
 const app = new cdk.App();
 
+const stackName =
+  app.node.tryGetContext("stack-name") || `restate-jepsen-cluster-${process.env.ENV_SUFFIX ?? process.env.USER}`;
 const controlNodeSource = app.node.tryGetContext("allow-source-cidr") ?? "0.0.0.0/0";
 const nodes = 3;
 const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO);
-const bucketName = app.node.tryGetContext("snapshots-bucket-name");
-const stackName =
-  app.node.tryGetContext("stack-name") || `restate-jepsen-cluster-${process.env.ENV_SUFFIX ?? process.env.USER}`;
+// if you have existing buckets, pass their names into the stack and the workers will be granted access;
+// if unset, unique buckets will be created as part of deploying the stack
+const snapshotsBucketName = app.node.tryGetContext("snapshots-bucket-name");
+const metadataBucketName = app.node.tryGetContext("metadata-bucket-name");
 
 // --- no configuration past this point ---
 
@@ -46,16 +49,27 @@ const instanceRole = new iam.Role(stack, "InstanceRole", {
 });
 const instanceProfile = new iam.InstanceProfile(stack, "InstanceProfile", { role: instanceRole });
 
-let bucket: s3.IBucket;
-if (bucketName) {
-  bucket = s3.Bucket.fromBucketName(stack, "Snapshots", bucketName);
+let snapshotsBucket: s3.IBucket;
+if (snapshotsBucketName) {
+  snapshotsBucket = s3.Bucket.fromBucketName(stack, "Snapshots", snapshotsBucketName);
 } else {
-  bucket = new s3.Bucket(stack, "Snapshots", {
+  snapshotsBucket = new s3.Bucket(stack, "Snapshots", {
     removalPolicy: cdk.RemovalPolicy.DESTROY,
   });
 }
-bucket.grantReadWrite(instanceRole);
-new cdk.CfnOutput(stack, `SnapshotsBucket`, { value: bucket.bucketName });
+snapshotsBucket.grantReadWrite(instanceRole);
+new cdk.CfnOutput(stack, `SnapshotsBucket`, { value: snapshotsBucket.bucketName });
+
+let metadataBucket: s3.IBucket;
+if (metadataBucketName) {
+  metadataBucket = s3.Bucket.fromBucketName(stack, "Metadata", metadataBucketName);
+} else {
+  metadataBucket = new s3.Bucket(stack, "Metadata", {
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+  });
+}
+metadataBucket.grantReadWrite(instanceRole);
+new cdk.CfnOutput(stack, `MetadataBucket`, { value: metadataBucket.bucketName });
 
 function addNodeInstance(n: number) {
   const cloudConfig = ec2.UserData.custom([`cloud_final_modules:`, `- [scripts-user, once]`].join("\n"));

@@ -78,10 +78,22 @@
  (close! [_ _test]))
 
 (defn workload
-  "Restate Metadata Store-backed Set test workload."
+  "Restate Metadata Store-backed Set test workload, using the replicated store backend."
   [opts]
   {:client    (SetMetadatsStoreClient. "jepsen-set" opts)
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
                                 :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))
    :heal-time 20})
+
+(defn workload-s3
+  "Restate Metadata Store-backed Set test workload, using the object-store backend."
+  [opts]
+  (merge (workload opts)
+         {:workload-opts
+          {:restate-config-toml "restate-server-s3-metadata.toml"
+           :additional-env
+           {:RESTATE_METADATA_CLIENT__BUCKET (:metadata-bucket opts)
+             ;; todo(pavel): region is not correctly inferred by metadata-client on EC2
+             ;;  (https://github.com/restatedev/restate/issues/2795)
+            :AWS_REGION (or (System/getenv "AWS_REGION") "us-east-1")}}}))
