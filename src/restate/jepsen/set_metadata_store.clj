@@ -92,5 +92,8 @@
   (merge (workload opts)
          {:workload-opts
           {:restate-config-toml "restate-server-s3-metadata.toml"
-           :additional-env      {:AWS_REGION "af-south-1"
-                                 :RESTATE_METADATA_CLIENT__BUCKET (:metadata-bucket opts)}}}))
+           :additional-env
+           {:RESTATE_METADATA_CLIENT__BUCKET (:metadata-bucket opts)
+             ;; todo(pavel): region is not correctly inferred by metadata-client on EC2
+             ;;  (https://github.com/restatedev/restate/issues/2795)
+            :AWS_REGION (or (System/getenv "AWS_REGION") "us-east-1")}}}))

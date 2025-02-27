@@ -40,7 +40,7 @@
    (fn [] (when (= (get-logs-count) expected-count) true))))
 
 (defn get-partition-processors-count [status]
-  (-> (restatectl :meta :status :| :grep (str " " status " ") :| :wc :-l)
+  (-> (restatectl :partitions :list :| :grep (str " " status " ") :| :wc :-l)
       Integer/parseInt))
 
 (defn wait-for-partition-leaders [expected-count]

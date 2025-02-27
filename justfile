@@ -20,8 +20,16 @@ destroy-aws-cluster stack-name="":
   npm run destroy -- --context stack-name={{stack-name}}
 
 run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restatedev/restate:main":
+  #!/usr/bin/env bash
+  set -e
+  METADATA_BUCKET=$(jq -r 'keys[0] as $stack_name | .[$stack_name].MetadataBucket' aws/cdk-outputs.json)
+
+  # todo(pavel): remove once we can configure unique prefixes for the metadata store
+  aws s3 rm --recursive "s3://${METADATA_BUCKET}"
+
   lein run test --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
     --image {{image}} \
+    --metadata-bucket "${METADATA_BUCKET}" \
     --leave-db-running true \
     --time-limit 120 --rate 10 --concurrency 5n --test-count 1 \
     --workload {{workload}} --nemesis {{nemesis}}

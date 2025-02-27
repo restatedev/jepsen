@@ -133,8 +133,6 @@
          (u/await-url "http://localhost:9070/health")
 
          (info "Waiting for all nodes to join cluster and partitions to be configured...")
-         ;; (u/wait-for-metadata-servers (u/restate-server-node-count opts))
-         ;; (u/wait-for-logs (:num-partitions opts))
          (u/wait-for-partition-leaders (:num-partitions opts))
          (u/wait-for-partition-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts))))
 
