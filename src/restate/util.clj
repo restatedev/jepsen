@@ -9,19 +9,39 @@
 
 (ns restate.util
   (:require
+   [clojure.string :as s]
    [clojure.tools.logging :refer [info]]
-   [slingshot.slingshot :refer [try+]]
-   [restate.http :as hu]
    [hato.client :as hc]
    [jepsen
     [control :as c]
-    [util :as util]]))
+    [util :as util]]
+   [restate.http :as hu]))
 
 (defn restate [cmd & args]
   (c/exec :docker :exec :restate :restate cmd args))
 
 (defn restatectl [cmd & args]
   (c/exec :docker :exec :restate :restatectl cmd args))
+
+(defn wait-for-container
+  "Blocks until a Docker container with the given name is running.
+
+   Options:
+     :retry-interval   How long between retries, in ms. Default 1s.
+     :log-interval     How long between logging that we're still waiting, in ms.
+                       Default matches retry-interval.
+     :timeout          How long until giving up and throwing :type :timeout, in ms.
+                       Default 60 seconds."
+  ([container-name]
+   (wait-for-container container-name {}))
+  ([container-name opts]
+   (info "Waiting for container" container-name "to be running...")
+   (util/await-fn
+    (fn []
+      (let [status (c/exec :docker :inspect :--format "{{.State.Status}}" container-name)]
+        (= (s/trim status) "running"))
+      (merge {:log-message (str "Waiting for container " container-name " to be running...")}
+             opts)))))
 
 (defn get-metadata-service-member-count []
   (-> (restatectl :meta :status :| :grep "Member .*\\[.\\+\\]" :| :wc :-l)
@@ -75,13 +95,11 @@
 
 (defn await-url [url]
   (let [client hu/client]
-    (util/await-fn (fn [] (try+ (->> (hc/get url (hu/defaults client))
-                                     (:status)
-                                     (= 200))
-                                (catch java.lang.Object {}
-                                  ((info "Error fetching" url "-" (:throwable &throw-context))
-                                   false))))
-                   {:log-message (str "Waiting for " url "...")})))
+    (util/await-fn (fn [] (->> (hc/get url (hu/defaults client))
+                               (:status)
+                               (= 200)))
+                   {:log-message (str "Waiting for " url "...")
+                    :log-interval 5000})))
 
 (defn await-service-deployment []
   (util/await-fn

@@ -131,6 +131,7 @@
             :--force-node-id node-id
             :--auto-provision (if (= node (first (:nodes test))) "true" "false")
             :--config-file "/config.toml"))
+         (u/wait-for-container "restate")
          (u/await-url "http://localhost:9070/health")
 
          (info "Waiting for all nodes to join cluster and partitions to be configured...")

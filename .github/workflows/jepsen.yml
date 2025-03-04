@@ -44,6 +44,8 @@ jobs:
     # id tokens are not available on forks
     if: github.event.repository.fork == false
     runs-on: warp-ubuntu-latest-x64-4x
+    env:
+      CLUSTER_NAME: jepsen-cluster-restatedev-jepsen-${{ github.event.pull_request.number != null && format('pr{0}', github.event.pull_request.number) || format('run{0}', github.run_id) }}
 
     steps:
     - uses: actions/checkout@v4
@@ -61,7 +63,7 @@ jobs:
       uses: ./.github/actions/setup
       with:
         ref: ${{ inputs.ref }}
-        clusterName: jepsen-cluster-restatedev-jepsen-pr${{ github.event.pull_request.number }}
+        clusterName: ${{ env.CLUSTER_NAME }}
 
     - name: Run Jepsen tests
       uses: ./.github/actions/run-tests
@@ -75,4 +77,4 @@ jobs:
     #   uses: ./.github/actions/teardown
     #   if: always()
     #   with:
-    #     clusterName: jepsen-cluster-restatedev-jepsen-pr${{ github.event.pull_request.number }}
+    #     clusterName: ${{ env.CLUSTER_NAME }}
