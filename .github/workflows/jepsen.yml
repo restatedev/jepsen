@@ -59,19 +59,22 @@ jobs:
         aws-region: us-east-1 # co-locate with WarpBuild worker
         role-to-assume: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
 
-    - uses: ./.github/actions/setup
+    - name: Setup Jepsen cluster
+      uses: ./.github/actions/setup
       with:
         ref: ${{ inputs.ref }}
+        clusterName: jepsen-cluster-restatedev-jepsen-pr${{ github.event.pull_request.number }}
 
-    - uses: ./.github/actions/run-tests
+    - name: Run Jepsen tests
+      uses: ./.github/actions/run-tests
       with:
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ inputs.restateCommit }}
-        clusterName: jepsen-cluster-restatedev-jepsen-pr${{ github.event.pull_request.number }}
         testConfig: ${{ inputs.testConfig || '{}' }}
 
-    # - uses: ./.github/actions/teardown
+    # - name: Tear down Jepsen cluster
+    #   uses: ./.github/actions/teardown
     #   if: always()
     #   with:
-    #     clusterName: jepsen-cluster-restatedev-jepsen
+    #     clusterName: jepsen-cluster-restatedev-jepsen-pr${{ github.event.pull_request.number }}
