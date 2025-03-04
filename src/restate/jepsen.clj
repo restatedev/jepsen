@@ -86,7 +86,8 @@
     db/DB
     (setup! [_db test node]
       (when (not (:dummy? (:ssh test)))
-        (info node "Setting up Restate")
+        (info node "Setting up Restate on host " (c/exec :hostname))
+
         (c/su
          (c/exec :mkdir :-p (str restate-root "restate-data"))
          (c/exec :chmod 777 restate-root)
@@ -133,7 +134,6 @@
             :--config-file "/config.toml"))
 
          (u/wait-for-container "restate")
-         (info "Hostname: " (c/exec :hostname))
          (u/await-url "http://localhost:9070/health")
 
          (info "Waiting for all nodes to join cluster and partitions to be configured...")
