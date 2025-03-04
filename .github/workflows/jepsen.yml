@@ -44,8 +44,6 @@ jobs:
     # id tokens are not available on forks
     if: github.event.repository.fork == false
     runs-on: warp-ubuntu-latest-x64-4x
-    concurrency:
-      group: singleton
 
     steps:
     - uses: actions/checkout@v4
