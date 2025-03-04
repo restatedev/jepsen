@@ -62,22 +62,16 @@ jobs:
     - uses: ./.github/actions/setup
       with:
         ref: ${{ inputs.ref }}
-        restateImageId: ${{ inputs.restateImageId }}
-        restatePr: ${{ inputs.restatePr }}
-        restateCommit: ${{ inputs.restateCommit }}
-        clusterName: jepsen-cluster-restatedev-jepsen
-        testConfig: ${{ inputs.testConfig || '{}' }}
 
     - uses: ./.github/actions/run-tests
       with:
-        ref: ${{ inputs.ref }}
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ inputs.restateCommit }}
-        clusterName: jepsen-cluster-restatedev-jepsen
+        clusterName: jepsen-cluster-restatedev-jepsen-pr${{ github.event.pull_request.number }}
         testConfig: ${{ inputs.testConfig || '{}' }}
 
-    - uses: ./.github/actions/teardown
-      if: always()
-      with:
-        clusterName: jepsen-cluster-restatedev-jepsen
+    # - uses: ./.github/actions/teardown
+    #   if: always()
+    #   with:
+    #     clusterName: jepsen-cluster-restatedev-jepsen

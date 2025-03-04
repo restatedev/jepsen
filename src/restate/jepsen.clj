@@ -99,6 +99,7 @@
            (c/exec :docker :tag (:image test) "restate"))
 
          (c/upload (str "resources/" (:restate-config-toml test)) restate-config)
+         (info node "Starting Restate server container")
          (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
                node-id (inc (.indexOf (:nodes test) node))
                replication-factor (->>

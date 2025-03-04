@@ -78,7 +78,9 @@
     (util/await-fn (fn [] (try+ (->> (hc/get url (hu/defaults client))
                                      (:status)
                                      (= 200))
-                                (catch java.lang.Object {} false)))
+                                (catch java.lang.Object {}
+                                  ((info "Error fetching" url "-" (:throwable &throw-context))
+                                   false))))
                    {:log-message (str "Waiting for " url "...")})))
 
 (defn await-service-deployment []
