@@ -9,10 +9,8 @@
 
 (ns restate.util
   (:require
+   [clojure.string :as s]
    [clojure.tools.logging :refer [info]]
-   [slingshot.slingshot :refer [try+]]
-   [restate.http :as hu]
-   [hato.client :as hc]
    [jepsen
     [control :as c]
     [util :as util]]))
@@ -22,6 +20,26 @@
 
 (defn restatectl [cmd & args]
   (c/exec :docker :exec :restate :restatectl cmd args))
+
+(defn wait-for-container
+  "Blocks until a Docker container with the given name is running.
+
+   Options:
+     :retry-interval   How long between retries, in ms. Default 1s.
+     :log-interval     How long between logging that we're still waiting, in ms.
+                       Default matches retry-interval.
+     :timeout          How long until giving up and throwing :type :timeout, in ms.
+                       Default 60 seconds."
+  ([container-name]
+   (wait-for-container container-name {}))
+  ([container-name opts]
+   (info "Waiting for container" container-name "to be running...")
+   (util/await-fn
+    (fn []
+      (let [status (c/exec :docker :inspect :--format "{{.State.Status}}" container-name)]
+        (= (s/trim status) "running"))
+      (merge {:log-message (str "Waiting for container " container-name " to be running...")}
+             opts)))))
 
 (defn get-metadata-service-member-count []
   (-> (restatectl :meta :status :| :grep "Member .*\\[.\\+\\]" :| :wc :-l)
@@ -39,17 +57,19 @@
   (util/await-fn
    (fn [] (when (= (get-logs-count) expected-count) true))))
 
-(defn get-partition-processors-count [status]
-  (-> (restatectl :partitions :list :| :grep (str " " status " ") :| :wc :-l)
+(defn get-partition-processors-count [regex]
+  (-> (restatectl :partitions :list :| :grep regex :| :wc :-l)
       Integer/parseInt))
 
 (defn wait-for-partition-leaders [expected-count]
   (util/await-fn
-   (fn [] (= (get-partition-processors-count "Active") expected-count))))
+   (fn [] (= (get-partition-processors-count "Leader.*Active") expected-count))
+   {:log-message (str "Waiting for " expected-count " leader partition processors...")}))
 
 (defn wait-for-partition-followers [expected-count]
   (util/await-fn
-   (fn [] (= (get-partition-processors-count "Follower") expected-count))))
+   (fn [] (= (get-partition-processors-count "Follower.*Active") expected-count))
+   {:log-message (str "Waiting for " expected-count " follower partition processors...")}))
 
 (defn get-deployments-count []
   (-> (restate :deployments :list :| :grep "host.docker.internal:9080" :| :wc :-l)
@@ -73,13 +93,15 @@
       nil)
     (merge {:log-message (str "Waiting for port " port " ...")} opts))))
 
-(defn await-url [url]
-  (let [client hu/client]
-    (util/await-fn (fn [] (try+ (->> (hc/get url (hu/defaults client))
-                                     (:status)
-                                     (= 200))
-                                (catch java.lang.Object {} false)))
-                   {:log-message (str "Waiting for " url "...")})))
+(defn await-url
+  ([url]
+   (await-url url {}))
+  ([url opts]
+   (util/await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
+                  (merge {:log-message (str "Waiting for " url "...")
+                          :log-interval 5000
+                          :timeout (* 120 1000)}
+                         opts))))
 
 (defn await-service-deployment []
   (util/await-fn

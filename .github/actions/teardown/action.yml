@@ -1,0 +1,15 @@
+name: Restate Jepsen tests
+description: "Run Restate Jepsen tests"
+inputs:
+  clusterName:
+    description: 'Jepsen workers cluster AWS stack name'
+    required: true
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Destroy cluster
+      shell: bash
+      working-directory: ./jepsen
+      run: just destroy-aws-cluster "${{ inputs.clusterName }}"

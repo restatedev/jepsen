@@ -76,7 +76,17 @@ function addNodeInstance(n: number) {
 
   const initScript = ec2.UserData.forLinux();
   initScript.addCommands(`hostnamectl set-hostname n${n}`);
+  initScript.addCommands(`if ! dpkg -l amazon-ssm-agent > /dev/null 2>&1; then
+    while fuser /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+      echo "Waiting for dpkg lock..."
+      sleep 5
+    done
 
+    wget https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb
+    dpkg -i amazon-ssm-agent.deb
+    rm amazon-ssm-agent.deb
+  fi
+  `);
   const userData = new ec2.MultipartUserData();
   userData.addUserDataPart(cloudConfig, "text/cloud-config");
   userData.addUserDataPart(initScript, "text/x-shellscript");

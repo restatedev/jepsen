@@ -86,7 +86,8 @@
     db/DB
     (setup! [_db test node]
       (when (not (:dummy? (:ssh test)))
-        (info node "Setting up Restate")
+        (info node "Setting up Restate on host " (c/exec :hostname))
+
         (c/su
          (c/exec :mkdir :-p (str restate-root "restate-data"))
          (c/exec :chmod 777 restate-root)
@@ -99,6 +100,7 @@
            (c/exec :docker :tag (:image test) "restate"))
 
          (c/upload (str "resources/" (:restate-config-toml test)) restate-config)
+         (info node "Starting Restate server container")
          (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
                node-id (inc (.indexOf (:nodes test) node))
                replication-factor (->>
@@ -128,13 +130,20 @@
             :--cluster-name (:cluster-name test)
             :--node-name node-name
             :--force-node-id node-id
-            :--auto-provision (if (= node (first (:nodes test))) "true" "false")
+            :--auto-provision (if (= node-id 1) "true" "false")
             :--config-file "/config.toml"))
+
+         (u/wait-for-container "restate")
          (u/await-url "http://localhost:9070/health")
 
          (info "Waiting for all nodes to join cluster and partitions to be configured...")
          (u/wait-for-partition-leaders (:num-partitions opts))
          (u/wait-for-partition-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts))))
+
+         (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :partitions :list))
+         (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :status))
+         (info "Restate whoami: " (c/exec :docker :exec :restate :restate :whoami))
+         (u/await-url "http://localhost:9070/health")
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")

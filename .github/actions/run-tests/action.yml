@@ -1,10 +1,6 @@
-name: Restate Jepsen tests
-description: "Run Restate Jepsen tests"
+name: Run Restate Jepsen tests
+description: "Runs Restate Jepsen test suite. Assumes you have already called the `setup` action."
 inputs:
-  ref:
-    description: 'Git ref to use for test suite'
-    required: false
-    default: ''
   restateImageId:
     description: 'Restate image (ignored if PR set)'
     required: false
@@ -15,10 +11,6 @@ inputs:
   restateCommit:
     description: 'Use CI Docker image from Restate commit'
     required: false
-  roleArn:
-    description: 'AWS role to assume'
-    required: true
-    default: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
   clusterName:
     description: 'Jepsen workers cluster AWS stack name'
     required: true
@@ -26,54 +18,11 @@ inputs:
     description: 'Jepsen test run configuration'
     required: false
     default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
-  retainCluster:
-    description: 'Retain the AWS worker node cluster after test'
-    required: false
 
 runs:
   using: "composite"
 
   steps:
-    - uses: actions/checkout@v4
-      with:
-        repository: restatedev/jepsen
-        ref: ${{ inputs.ref }}
-        path: jepsen
-
-    - uses: extractions/setup-just@v2
-
-    - uses: actions/setup-node@v4
-      with:
-        node-version: "22"
-
-    - uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '21'
-
-    - uses: DeLaGuardo/setup-clojure@13.0
-      with:
-        lein: 2.11.2
-
-    - name: Build SDK services
-      working-directory: ./jepsen
-      run: just make-services
-      shell: bash
-
-    - name: Prepare environment for Jepsen control node
-      shell: bash
-      working-directory: ./jepsen
-      run: |
-        echo "::group::Install Jepsen dependencies (apt)"
-        sudo apt-get update && sudo apt-get install -y gnuplot-nox
-        echo "::endgroup::"
-
-        echo "::group::Fetch Clojure dependencies (lein)"
-        lein deps
-        echo "::endgroup::"
-
-    # TODO: can we use snapshots to speed up the worker environment prep up to this point?
-
     - name: Download Restate Docker image
       if: inputs.restateCommit != '' || inputs.restatePr != ''
       uses: dawidd6/action-download-artifact@v3
@@ -85,20 +34,6 @@ runs:
         name: restate.tar
         workflow_conclusion: ""
         path: ./jepsen
-
-    - uses: aws-actions/configure-aws-credentials@v4
-      with:
-        # Co-locate the cluster with WarpBuild:
-        aws-region: us-east-1
-        role-to-assume: ${{ inputs.roleArn }}
-
-    - name: Create test cluster
-      shell: bash
-      id: create-cluster
-      working-directory: ./jepsen
-      run: |
-        SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
-        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32"
 
     - name: Run Jepsen tests
       id: jepsen-tests
@@ -148,10 +83,3 @@ runs:
       with:
         name: jepsen-store
         path: ./jepsen/store
-
-    # TODO: update this to destroy by default after testing
-    - name: Destroy cluster
-      shell: bash
-      if: ${{ always() && !(inputs.retainCluster || true) }}
-      working-directory: ./jepsen
-      run: just destroy-aws-cluster "${{ inputs.clusterName }}"
