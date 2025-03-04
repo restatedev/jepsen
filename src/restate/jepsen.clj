@@ -133,14 +133,17 @@
             :--config-file "/config.toml"))
 
          (u/wait-for-container "restate")
-         ;; (u/await-url "http://localhost:9070/health")
+         (u/await-url "http://localhost:9070/health")
 
          (info "Waiting for all nodes to join cluster and partitions to be configured...")
          (u/wait-for-partition-leaders (:num-partitions opts))
          (u/wait-for-partition-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts))))
+
          (info "Hostname: " (c/exec :hostname))
+         (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :partitions :list))
          (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :status))
          (info "Restate whoami: " (c/exec :docker :exec :restate :restate :whoami))
+         (u/await-url "http://localhost:9070/health")
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")

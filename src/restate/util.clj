@@ -11,11 +11,9 @@
   (:require
    [clojure.string :as s]
    [clojure.tools.logging :refer [info]]
-   [hato.client :as hc]
    [jepsen
     [control :as c]
-    [util :as util]]
-   [restate.http :as hu]))
+    [util :as util]]))
 
 (defn restate [cmd & args]
   (c/exec :docker :exec :restate :restate cmd args))
@@ -59,17 +57,19 @@
   (util/await-fn
    (fn [] (when (= (get-logs-count) expected-count) true))))
 
-(defn get-partition-processors-count [status]
-  (-> (restatectl :partitions :list :| :grep (str " " status " ") :| :wc :-l)
+(defn get-partition-processors-count [regex]
+  (-> (restatectl :partitions :list :| :grep regex :| :wc :-l)
       Integer/parseInt))
 
 (defn wait-for-partition-leaders [expected-count]
   (util/await-fn
-   (fn [] (= (get-partition-processors-count "Active") expected-count))))
+   (fn [] (= (get-partition-processors-count "Leader.*Active") expected-count))
+   {:log-message (str "Waiting for " expected-count " leader partition processors...")}))
 
 (defn wait-for-partition-followers [expected-count]
   (util/await-fn
-   (fn [] (= (get-partition-processors-count "Follower") expected-count))))
+   (fn [] (= (get-partition-processors-count "Follower.*Active") expected-count))
+   {:log-message (str "Waiting for " expected-count " follower partition processors...")}))
 
 (defn get-deployments-count []
   (-> (restate :deployments :list :| :grep "host.docker.internal:9080" :| :wc :-l)
@@ -94,20 +94,16 @@
     (merge {:log-message (str "Waiting for port " port " ...")} opts))))
 
 (defn await-url [url]
-  (let [client hu/client]
-    (util/await-fn (fn [] (->> (hc/get url (hu/defaults client))
-                               (:status)
-                               (= 200)))
-                   {:log-message (str "Waiting for " url "...")
-                    :log-interval 5000})))
+  (util/await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
+                 {:log-message (str "Waiting for " url "...")
+                  :log-interval 5000}))
 
 (defn await-service-deployment []
   (util/await-fn
    (fn [] (>= (get-deployments-count) 2))) ;; expecting at least Set + Register
 
-  ;; (info "Waiting for service to become callable...")
-  ;; (await-url "http://localhost:8080/Set/0/get")
-  )
+  (info "Waiting for service to become callable...")
+  (await-url "http://localhost:8080/Set/0/get"))
 
 (defn restate-server-node-count [opts] (- (count (:nodes opts)) (:dedicated-service-nodes opts)))
 
