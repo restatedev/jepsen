@@ -138,6 +138,9 @@
          (info "Waiting for all nodes to join cluster and partitions to be configured...")
          (u/wait-for-partition-leaders (:num-partitions opts))
          (u/wait-for-partition-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts))))
+         (info "Hostname: " (c/exec :hostname))
+         (info "Restate cluster status: " (c/exec :docker :exec :restatectl :status))
+         (info "Restate whoami: " (c/exec :docker :exec :restate :whoami))
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")
