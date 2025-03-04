@@ -93,10 +93,15 @@
       nil)
     (merge {:log-message (str "Waiting for port " port " ...")} opts))))
 
-(defn await-url [url]
-  (util/await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
-                 {:log-message (str "Waiting for " url "...")
-                  :log-interval 5000}))
+(defn await-url
+  ([url]
+   (await-url url {}))
+  ([url opts]
+   (util/await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
+                  (merge {:log-message (str "Waiting for " url "...")
+                          :log-interval 5000
+                          :timeout 120 * 1000}
+                         opts))))
 
 (defn await-service-deployment []
   (util/await-fn

@@ -2,44 +2,39 @@ name: Set up Restate Jepsen test suite and cluster
 description: "Provisiongs Jepsen worker nodes and sets up the test suite execution environment."
 inputs:
   ref:
-    description: 'Git ref to use for test suite'
+    description: "Git ref to use for test suite"
     required: false
-    default: ''
+    default: ""
   restateImageId:
-    description: 'Restate image (ignored if PR set)'
+    description: "Restate image (ignored if PR set)"
     required: false
-    default: 'ghcr.io/restatedev/restate:main'
+    default: "ghcr.io/restatedev/restate:main"
   restatePr:
-    description: 'Use CI Docker image from PR (ignored if commit is set)'
+    description: "Use CI Docker image from PR (ignored if commit is set)"
     required: false
   restateCommit:
-    description: 'Use CI Docker image from Restate commit'
+    description: "Use CI Docker image from Restate commit"
     required: false
   roleArn:
-    description: 'AWS role to assume'
+    description: "AWS role to assume"
     required: true
-    default: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
+    default: "arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role"
   clusterName:
-    description: 'Jepsen workers cluster AWS stack name'
+    description: "Jepsen workers cluster AWS stack name"
     required: true
   testConfig:
-    description: 'Jepsen test run configuration'
+    description: "Jepsen test run configuration"
     required: false
-    default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
-  retainCluster:
-    description: 'Retain the AWS worker node cluster after test'
+    default: '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
+  workingDirectory:
+    description: "Test suite checkout location/Jepsen working directory"
     required: false
+    default: "jepsen"
 
 runs:
   using: "composite"
 
   steps:
-    - uses: actions/checkout@v4
-      with:
-        repository: restatedev/jepsen
-        ref: ${{ inputs.ref }}
-        path: jepsen
-
     - uses: extractions/setup-just@v2
 
     - uses: actions/setup-node@v4
@@ -48,36 +43,40 @@ runs:
 
     - uses: actions/setup-java@v4
       with:
-        distribution: 'temurin'
-        java-version: '21'
+        distribution: "temurin"
+        java-version: "21"
 
     - uses: DeLaGuardo/setup-clojure@13.0
       with:
         lein: 2.11.2
 
-    - name: Build SDK services
-      working-directory: ./jepsen
-      run: just make-services
-      shell: bash
-
     - name: Prepare environment for Jepsen control node
       shell: bash
-      working-directory: ./jepsen
-      run: |
-        echo "::group::Install Jepsen dependencies (apt)"
-        sudo apt-get update && sudo apt-get install -y gnuplot-nox
-        echo "::endgroup::"
+      working-directory: ./${{ inputs.workDir }}
+      run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
-        echo "::group::Fetch Clojure dependencies (lein)"
-        lein deps
-        echo "::endgroup::"
+    # - name: Create snapshot
+    #   uses: WarpBuilds/snapshot-save@v1
+    #   with:
+    #     alias: "restate-jepsen-control-env-${{ github.sha }}"
+    #     fail-on-error: true
+    #     wait-timeout-minutes: 10
 
-    # TODO: can we use snapshots to speed up the worker environment prep up to this point?
+    - uses: actions/checkout@v4
+      with:
+        repository: restatedev/jepsen
+        ref: ${{ inputs.ref }}
+        path: ${{ inputs.workDir }}
+
+    - name: Build SDK services
+      working-directory: ./${{ inputs.workDir }}
+      run: just make-services
+      shell: bash
 
     - name: Create test cluster
       shell: bash
       id: create-cluster
-      working-directory: ./jepsen
+      working-directory: ./${{ inputs.workingDirectory }}
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
         just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32"
