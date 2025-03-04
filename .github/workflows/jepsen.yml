@@ -45,7 +45,7 @@ jobs:
     if: github.event.repository.fork == false
     runs-on: warp-ubuntu-latest-x64-4x
     env:
-      CLUSTER_NAME: jepsen-cluster-restatedev-jepsen-${{ github.event.pull_request.number != null && format('pr{0}', github.event.pull_request.number) || format('run{0}', github.run_id) }}
+      CLUSTER_NAME: restatedev-jepsen-${{ github.event.pull_request.number != null && format('pr{0}', github.event.pull_request.number) || format('run{0}', github.run_id) }}
 
     steps:
     - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
         aws-region: us-east-1 # co-locate with WarpBuild worker
         role-to-assume: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
 
-    - name: Setup Jepsen cluster
+    - name: Setup Jepsen cluster ${{ env.CLUSTER_NAME }}
       uses: ./.github/actions/setup
       with:
         ref: ${{ inputs.ref }}
@@ -73,7 +73,7 @@ jobs:
         restateCommit: ${{ inputs.restateCommit }}
         testConfig: ${{ inputs.testConfig || '{}' }}
 
-    - name: Tear down Jepsen cluster
+    - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
       uses: ./.github/actions/teardown
       if: always()
       with:
