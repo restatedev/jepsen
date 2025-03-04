@@ -129,7 +129,7 @@
             :--cluster-name (:cluster-name test)
             :--node-name node-name
             :--force-node-id node-id
-            :--auto-provision (if (= node (first (:nodes test))) "true" "false")
+            :--auto-provision (if (= node-id 1) "true" "false")
             :--config-file "/config.toml"))
 
          (u/wait-for-container "restate")
