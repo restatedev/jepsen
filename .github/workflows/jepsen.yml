@@ -54,14 +54,30 @@ jobs:
         sparse-checkout: |
           .github
 
-    - name: Run Jepsen tests
-      uses: ./.github/actions/run-tests
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-1 # co-locate with WarpBuild worker
+        role-to-assume: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
+
+    - uses: ./.github/actions/setup
       with:
         ref: ${{ inputs.ref }}
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ inputs.restateCommit }}
         clusterName: jepsen-cluster-restatedev-jepsen
-        roleArn: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
         testConfig: ${{ inputs.testConfig || '{}' }}
-        retainCluster: ${{ inputs.retainCluster }}
+
+    - uses: ./.github/actions/run-tests
+      with:
+        ref: ${{ inputs.ref }}
+        restateImageId: ${{ inputs.restateImageId }}
+        restatePr: ${{ inputs.restatePr }}
+        restateCommit: ${{ inputs.restateCommit }}
+        clusterName: jepsen-cluster-restatedev-jepsen
+        testConfig: ${{ inputs.testConfig || '{}' }}
+
+    - uses: ./.github/actions/teardown
+      if: always()
+      with:
+        clusterName: jepsen-cluster-restatedev-jepsen
