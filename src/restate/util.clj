@@ -105,8 +105,9 @@
   (util/await-fn
    (fn [] (>= (get-deployments-count) 2))) ;; expecting at least Set + Register
 
-  (info "Waiting for service to become callable...")
-  (await-url "http://localhost:8080/Set/0/get"))
+  ;; (info "Waiting for service to become callable...")
+  ;; (await-url "http://localhost:8080/Set/0/get")
+  )
 
 (defn restate-server-node-count [opts] (- (count (:nodes opts)) (:dedicated-service-nodes opts)))
 
