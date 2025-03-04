@@ -26,7 +26,7 @@ inputs:
     description: "Jepsen test run configuration"
     required: false
     default: '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
-  workingDirectory:
+  workDir:
     description: "Test suite checkout location/Jepsen working directory"
     required: false
     default: "jepsen"
@@ -52,13 +52,12 @@ runs:
 
     - name: Prepare environment for Jepsen control node
       shell: bash
-      working-directory: ./${{ inputs.workDir }}
       run: sudo apt-get update && sudo apt-get install -y gnuplot-nox
 
     # - name: Create snapshot
     #   uses: WarpBuilds/snapshot-save@v1
     #   with:
-    #     alias: "restate-jepsen-control-env-${{ github.sha }}"
+    #     alias: "restate-jepsen-control-env-${{ github.sha }}-${{ inputs.ref || 'main' }}"
     #     fail-on-error: true
     #     wait-timeout-minutes: 10
 
@@ -76,7 +75,7 @@ runs:
     - name: Create test cluster
       shell: bash
       id: create-cluster
-      working-directory: ./${{ inputs.workingDirectory }}
+      working-directory: ./${{ inputs.workDir }}
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
         just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32"
