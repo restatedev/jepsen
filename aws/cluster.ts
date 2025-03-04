@@ -76,6 +76,10 @@ function addNodeInstance(n: number) {
 
   const initScript = ec2.UserData.forLinux();
   initScript.addCommands(`hostnamectl set-hostname n${n}`);
+  initScript.addCommands(
+    "wget https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_amd64/amazon-ssm-agent.deb",
+  );
+  initScript.addCommands("dpkg -i amazon-ssm-agent.deb")
 
   const userData = new ec2.MultipartUserData();
   userData.addUserDataPart(cloudConfig, "text/cloud-config");
