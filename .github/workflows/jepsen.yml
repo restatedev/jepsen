@@ -73,8 +73,8 @@ jobs:
         restateCommit: ${{ inputs.restateCommit }}
         testConfig: ${{ inputs.testConfig || '{}' }}
 
-    # - name: Tear down Jepsen cluster
-    #   uses: ./.github/actions/teardown
-    #   if: always()
-    #   with:
-    #     clusterName: ${{ env.CLUSTER_NAME }}
+    - name: Tear down Jepsen cluster
+      uses: ./.github/actions/teardown
+      if: always()
+      with:
+        clusterName: ${{ env.CLUSTER_NAME }}
