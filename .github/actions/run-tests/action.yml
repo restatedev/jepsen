@@ -18,6 +18,10 @@ inputs:
     description: 'Jepsen test run configuration'
     required: false
     default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
+  workDir:
+    description: "Test suite checkout location/Jepsen working directory"
+    required: false
+    default: "jepsen"
 
 runs:
   using: "composite"
@@ -33,22 +37,30 @@ runs:
         commit: ${{ inputs.restateCommit }}
         name: restate.tar
         workflow_conclusion: ""
-        path: ./jepsen
+        path: ./${{ inputs.workDir }}
 
     - name: Run Jepsen tests
       id: jepsen-tests
       shell: bash
-      working-directory: ./jepsen
+      working-directory: ./${{ inputs.workDir }}
       run: |
         set +e
 
+        echo "## Jepsen tests" >> $GITHUB_STEP_SUMMARY
         if [ -f restate.tar ]; then
           JEPSEN_RESTATE_IMAGE='localhost/restatedev/restate-commit-download:latest --image-tarball restate.tar'
         else
           JEPSEN_RESTATE_IMAGE='${{ inputs.restateImageId || 'ghcr.io/restatedev/restate:main' }}'
         fi
+        echo "Using Restate image: \`${JEPSEN_RESTATE_IMAGE}\`" >> $GITHUB_STEP_SUMMARY
+        echo >> $GITHUB_STEP_SUMMARY
 
-        STATUS=0
+        OVERALL_STATUS=0
+
+        RESULTS_TABLE=results-table.md
+        echo "Test Results Summary" >> ${RESULTS_TABLE}
+        echo "| Workload | Nemesis | Status |" >> ${RESULTS_TABLE}
+        echo "| --- | --- | --- |" >> ${RESULTS_TABLE}
 
         for WORKLOAD in ${{ fromJSON(inputs.testConfig).workloads || 'set-vo' }}; do
           for NEMESIS in ${{ fromJSON(inputs.testConfig).nemeses || 'partition-random-node' }}; do
@@ -67,19 +79,42 @@ runs:
               --leave-db-running ${{ inputs.retainCluster || 'false' }}
 
             if [ $? -ne 0 ]; then
-              STATUS=1
+              OVERALL_STATUS=1
+              TEST_STATUS="❌"
               echo "::error::Test workload: ${WORKLOAD} nemesis: ${NEMESIS} failed"
+            else
+              TEST_STATUS="✅"
             fi
+
+            echo "${WORKLOAD} | ${NEMESIS} | ${TEST_STATUS}" >> ${RESULTS_TABLE}
+            echo "<details><summary>$(tail -1 store/latest/jepsen.log)</summary><pre>" > details-${WORKLOAD}-${NEMESIS}.md
+            grep -A 9999 "Analysis complete" store/latest/jepsen.log >> details-${WORKLOAD}-${NEMESIS}.md
+            echo "</pre></details>" >> details-${WORKLOAD}-${NEMESIS}.md
 
             echo "::endgroup::"
           done
         done
 
-        exit ${STATUS}
+        # Add overall status header and summary table at the end
+        if [ ${OVERALL_STATUS} -eq 0 ]; then
+          echo "✅ All tests passed successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Some tests failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo >> $GITHUB_STEP_SUMMARY
+        cat ${RESULTS_TABLE} >> $GITHUB_STEP_SUMMARY
+        for WORKLOAD in ${{ fromJSON(inputs.testConfig).workloads || 'set-vo' }}; do
+          for NEMESIS in ${{ fromJSON(inputs.testConfig).nemeses || 'partition-random-node' }}; do
+            echo "### Workload ${WORKLOAD} using nemesis ${NEMESIS}" >> $GITHUB_STEP_SUMMARY
+            cat details-${WORKLOAD}-${NEMESIS}.md >> $GITHUB_STEP_SUMMARY
+          done
+        done
+
+        exit ${OVERALL_STATUS}
 
     - name: Upload Jepsen output
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: jepsen-store
-        path: ./jepsen/store
+        path: ./${{ inputs.workDir }}/store
