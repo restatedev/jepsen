@@ -72,6 +72,11 @@ runs:
       run: just make-services
       shell: bash
 
+    - name: Fetch Jepsen dependencies
+      working-directory: ./${{ inputs.workDir }}
+      run: lein deps
+      shell: bash
+
     - name: Create test cluster
       shell: bash
       id: create-cluster
