@@ -113,7 +113,9 @@
            (c/exec
             :docker
             :run
-            (str "--pull=" (:image-pull-policy opts))
+            (str "--pull=" (if (:image-tarball test)
+                             (:image-pull-policy opts)
+                             "never"))
             :--name=restate
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             ;; :--add-host :host.docker.internal:host-gateway ;; podman doesn't support this
@@ -247,7 +249,10 @@
       :workload     Type of workload.
       :nemesis      Nemesis to apply."
   [opts]
-  (let [workload ((get workloads (:workload opts)) opts)]
+  (let [unique-id (.format
+                   (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss")
+                   (java.util.Date.))
+        workload ((get workloads (:workload opts)) (merge opts {:unique-id unique-id}))]
     (merge tests/noop-test
            opts
            {:restate-config-toml "restate-server.toml"}
@@ -255,9 +260,7 @@
            (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
            {:pure-generators true
             :name            (str "restate-" (name (:workload opts)))
-            :cluster-name    (str "jepsen-" (.format
-                                             (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss")
-                                             (java.util.Date.)))
+            :cluster-name    (str "jepsen-" unique-id)
             :db              (cluster-setup (restate opts) (app-server opts))
             :client          (:client workload)
             :nemesis         (get nemeses (:nemesis opts))
@@ -293,7 +296,7 @@
     :default "ghcr.io/restatedev/restate:main"]
    [nil "--image-tarball STRING" "Restate container local path"]
    [nil "--image-pull STRING" "Docker pull policy (missing | always | never)"
-    :default "missing"]
+    :default "always"]
    ["-w" "--workload NAME" "Workload to run"
     :missing  (str "--workload " (cli/one-of workloads))
     :validate (workloads (cli/one-of workloads))]

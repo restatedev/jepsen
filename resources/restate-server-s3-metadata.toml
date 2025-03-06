@@ -16,10 +16,7 @@ type = "replicated"
 
 [metadata-client]
 type = "object-store"
-bucket = "<metadata-bucket>" # set via environment
-
-[metadata-client.credentials]
-type = "aws-env"
+path = "s3://<metadata-bucket>" # set via environment
 
 [bifrost]
 default-provider = "replicated"

@@ -23,10 +23,7 @@ run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restat
   #!/usr/bin/env bash
   set -e
   METADATA_BUCKET=$(jq -r 'keys[0] as $stack_name | .[$stack_name].MetadataBucket' aws/cdk-outputs.json)
-
-  # todo(pavel): remove once we can configure unique prefixes for the metadata store
-  aws s3 rm --recursive "s3://${METADATA_BUCKET}"
-
+  # NB: we should use unique prefixes for each test run so that we don't have to wipe the bucket contents
   lein run test --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
     --image {{image}} \
     --metadata-bucket "${METADATA_BUCKET}" \

@@ -100,7 +100,7 @@
    (util/await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
                   (merge {:log-message (str "Waiting for " url "...")
                           :log-interval 5000
-                          :timeout (* 120 1000)}
+                          :timeout (* 60 1000)}
                          opts))))
 
 (defn await-service-deployment []
