@@ -53,6 +53,7 @@ if (bucketName) {
   bucket = s3.Bucket.fromBucketName(stack, "ClusterBucket", bucketName);
 } else {
   bucket = new s3.Bucket(stack, "ClusterBucket", {
+    autoDeleteObjects: true,
     removalPolicy: cdk.RemovalPolicy.DESTROY,
   });
 }
