@@ -89,11 +89,11 @@
 (defn workload-s3
   "Restate Metadata Store-backed Set test workload, using the object-store backend."
   [opts]
-  (merge (workload opts)
-         {:workload-opts
-          {:restate-config-toml "restate-server-s3-metadata.toml"
-           :additional-env
-           {:RESTATE_METADATA_CLIENT__PATH (str "s3://" (:metadata-bucket opts) "/metadata-" (:unique-id opts))
-             ;; todo(pavel): region is not correctly inferred by metadata-client on EC2
-             ;;  (https://github.com/restatedev/restate/issues/2795)
-            :AWS_REGION (or (System/getenv "AWS_REGION") "us-east-1")}}}))
+  (let [metadata-bucket (:metadata-bucket opts)]
+    (when (nil? metadata-bucket)
+      (throw (IllegalArgumentException. "Required parameter missing: :metadata-bucket")))
+    (merge (workload opts)
+           {:workload-opts
+            {:restate-config-toml "restate-server-s3-metadata.toml"
+             :additional-env
+             {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))}}})))

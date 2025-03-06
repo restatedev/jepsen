@@ -21,8 +21,7 @@ const nodes = 3;
 const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO);
 // if you have existing buckets, pass their names into the stack and the workers will be granted access;
 // if unset, unique buckets will be created as part of deploying the stack
-const snapshotsBucketName = app.node.tryGetContext("snapshots-bucket-name");
-const metadataBucketName = app.node.tryGetContext("metadata-bucket-name");
+const bucketName = app.node.tryGetContext("bucket-name");
 
 // --- no configuration past this point ---
 
@@ -49,27 +48,16 @@ const instanceRole = new iam.Role(stack, "InstanceRole", {
 });
 const instanceProfile = new iam.InstanceProfile(stack, "InstanceProfile", { role: instanceRole });
 
-let snapshotsBucket: s3.IBucket;
-if (snapshotsBucketName) {
-  snapshotsBucket = s3.Bucket.fromBucketName(stack, "Snapshots", snapshotsBucketName);
+let bucket: s3.IBucket;
+if (bucketName) {
+  bucket = s3.Bucket.fromBucketName(stack, "ClusterBucket", bucketName);
 } else {
-  snapshotsBucket = new s3.Bucket(stack, "Snapshots", {
+  bucket = new s3.Bucket(stack, "ClusterBucket", {
     removalPolicy: cdk.RemovalPolicy.DESTROY,
   });
 }
-snapshotsBucket.grantReadWrite(instanceRole);
-new cdk.CfnOutput(stack, `SnapshotsBucket`, { value: snapshotsBucket.bucketName });
-
-let metadataBucket: s3.IBucket;
-if (metadataBucketName) {
-  metadataBucket = s3.Bucket.fromBucketName(stack, "Metadata", metadataBucketName);
-} else {
-  metadataBucket = new s3.Bucket(stack, "Metadata", {
-    removalPolicy: cdk.RemovalPolicy.DESTROY,
-  });
-}
-metadataBucket.grantReadWrite(instanceRole);
-new cdk.CfnOutput(stack, `MetadataBucket`, { value: metadataBucket.bucketName });
+bucket.grantReadWrite(instanceRole);
+new cdk.CfnOutput(stack, `BucketName`, { value: bucket.bucketName });
 
 function addNodeInstance(n: number) {
   const cloudConfig = ec2.UserData.custom([`cloud_final_modules:`, `- [scripts-user, once]`].join("\n"));
