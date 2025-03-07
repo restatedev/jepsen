@@ -114,8 +114,9 @@
             :docker
             :run
             (str "--pull=" (if (:image-tarball test)
-                             (:image-pull-policy opts)
-                             "never"))
+                             "never"
+                             (:image-pull-policy opts)))
+
             :--name=restate
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             ;; :--add-host :host.docker.internal:host-gateway ;; podman doesn't support this
