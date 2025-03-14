@@ -13,7 +13,8 @@
    [clojure.tools.logging :refer [info]]
    [jepsen
     [control :as c]
-    [util :as util]]))
+    [util :as util]]
+   [slingshot.slingshot :refer [throw+]]))
 
 (defn restate [cmd & args]
   (c/exec :docker :exec :restate :restate cmd args))
@@ -37,7 +38,8 @@
    (util/await-fn
     (fn []
       (let [status (c/exec :docker :inspect :--format "{{.State.Status}}" container-name)]
-        (= (s/trim status) "running"))
+        (or (= (s/trim status) "running")
+            (throw+ {:type :restate-container-not-running})))
       (merge {:log-message (str "Waiting for container " container-name " to be running...")}
              opts)))))
 
@@ -45,17 +47,9 @@
   (-> (restatectl :meta :status :| :grep "Member .*\\[.\\+\\]" :| :wc :-l)
       Integer/parseInt))
 
-(defn wait-for-metadata-servers [expected-count]
-  (util/await-fn
-   (fn [] (when (= (get-metadata-service-member-count) expected-count) true))))
-
 (defn get-logs-count []
   (-> (restatectl :meta :get :-k "bifrost_config" :| :jq ".logs | length")
       Integer/parseInt))
-
-(defn wait-for-logs [expected-count]
-  (util/await-fn
-   (fn [] (when (= (get-logs-count) expected-count) true))))
 
 (defn get-partition-processors-count [regex]
   (-> (restatectl :partitions :list :| :grep regex :| :wc :-l)
@@ -64,22 +58,26 @@
 (defn get-partition-processor-leader-count []
   (get-partition-processors-count "Leader.*Active"))
 
-(defn wait-for-partition-leaders [expected-count]
-  (util/await-fn
-   (fn [] (= (get-partition-processor-leader-count) expected-count))
-   {:log-message (str "Waiting for " expected-count " leader partition processors...")}))
-
 (defn get-partition-processor-follower-count []
   (get-partition-processors-count "Follower.*Active"))
 
-(defn wait-for-partition-followers [expected-count]
+(defn wait-for-partition-leaders [expected-count]
   (util/await-fn
-   (fn [] (= (get-partition-processor-follower-count) expected-count))
-   {:log-message (str "Waiting for " expected-count " follower partition processors...")}))
+   (fn [] (or (= (get-partition-processor-leader-count) expected-count)
+              (throw+ {:type :restate-pp-not-ready})))
+   {:log-message (str "Waiting for" expected-count "leader partition processors...")
+    :log-interval 0}))
 
 (defn get-deployments-count []
-  (-> (restate :deployments :list :| :grep "host.docker.internal:9080" :| :wc :-l)
+  (-> (restate :deployments :list :| :grep "Active" :| :wc :-l)
       Integer/parseInt))
+
+(defn wait-for-partition-followers [expected-count]
+  (util/await-fn
+   (fn [] (or (= (get-partition-processor-follower-count) expected-count)
+              (throw+ {:type :restate-pp-not-ready})))
+   {:log-message (str "Waiting for" expected-count "follower partition processors...")
+    :log-interval 0}))
 
 (defn await-tcp-port
   ;; copy of the built-in Jepsen one with ability to set custom host
@@ -111,7 +109,8 @@
 
 (defn await-service-deployment []
   (util/await-fn
-   (fn [] (>= (get-deployments-count) 2))) ;; expecting at least Set + Register
+   (fn [] (or (>= (get-deployments-count) 1)
+              (throw+ {:type :service-deployments-not-ready}))))
 
   (info "Waiting for service to become callable...")
   (await-url "http://localhost:8080/Set/0/get"))

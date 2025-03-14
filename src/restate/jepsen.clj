@@ -79,6 +79,9 @@
   [env]
   (mapcat (fn [[k v]] ["--env" (str (name k) "=" v)]) env))
 
+(defn- get-node-name [nodes-list node]
+  (str "n" (inc (.indexOf nodes-list node))))
+
 (defn restate
   "A deployment of Restate server."
   [opts]
@@ -86,7 +89,7 @@
     db/DB
     (setup! [_db test node]
       (when (not (:dummy? (:ssh test)))
-        (info node "Setting up Restate on host " (c/exec :hostname))
+        (info node "Setting up Restate on" (c/exec :hostname))
 
         (c/su
          (c/exec :mkdir :-p (str restate-root "restate-data"))
@@ -101,7 +104,7 @@
 
          (c/upload (str "resources/" (:restate-config-toml test)) restate-config)
          (info node "Starting Restate server container")
-         (let [node-name (str "n" (inc (.indexOf (:nodes test) node)))
+         (let [node-name (get-node-name (:nodes test) node)
                node-id (inc (.indexOf (:nodes test) node))
                replication-factor (->>
                                    (/ (u/restate-server-node-count opts) 2) m/floor int inc)
@@ -139,24 +142,18 @@
 
            (u/wait-for-container "restate")
            (u/await-url "http://localhost:9070/health")
+           (info (u/restate :whoami))
 
-           (info "Waiting for partition processors to come up (expecting " (:num-partitions opts) " leaders and " expected-followers " followers)")
+           (info "Waiting for partition processors to become active (expecting"
+                 (:num-partitions opts) "leader(s) and" expected-followers "follower(s))")
            (u/wait-for-partition-leaders (:num-partitions opts))
-           (u/wait-for-partition-followers expected-followers)
-           (info "restatectl reports "
-             (u/get-partition-processor-leader-count)
-             (u/get-partition-processor-follower-count)
-             " partition leaders/followers, resp."))
-
-         (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :partitions :list))
-         (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :status :--extra))
-         (info "Restate whoami: " (c/exec :docker :exec :restate :restate :whoami))
-         (u/await-url "http://localhost:9070/health")
+           (u/wait-for-partition-followers expected-followers))
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")
            (when (> (:dedicated-service-nodes opts) 0) (u/await-tcp-port (last (:nodes opts)) 9080))
-           (u/restate :deployments :register (app-service-url opts) :--yes))
+           (u/restate :deployments :register (app-service-url opts) :--yes)
+           (info "Restate cluster status:\n" (u/restatectl :status :--extra)))
 
          (u/await-service-deployment))))
 
