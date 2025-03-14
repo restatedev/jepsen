@@ -61,14 +61,20 @@
   (-> (restatectl :partitions :list :| :grep regex :| :wc :-l)
       Integer/parseInt))
 
+(defn get-partition-processor-leader-count []
+  (get-partition-processors-count "Leader.*Active"))
+
 (defn wait-for-partition-leaders [expected-count]
   (util/await-fn
-   (fn [] (= (get-partition-processors-count "Leader.*Active") expected-count))
+   (fn [] (= (get-partition-processor-leader-count) expected-count))
    {:log-message (str "Waiting for " expected-count " leader partition processors...")}))
+
+(defn get-partition-processor-follower-count []
+  (get-partition-processors-count "Follower.*Active"))
 
 (defn wait-for-partition-followers [expected-count]
   (util/await-fn
-   (fn [] (= (get-partition-processors-count "Follower.*Active") expected-count))
+   (fn [] (= (get-partition-processor-follower-count) expected-count))
    {:log-message (str "Waiting for " expected-count " follower partition processors...")}))
 
 (defn get-deployments-count []

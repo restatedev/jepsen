@@ -105,6 +105,7 @@
                node-id (inc (.indexOf (:nodes test) node))
                replication-factor (->>
                                    (/ (u/restate-server-node-count opts) 2) m/floor int inc)
+               expected-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts)))
                metadata-addresses (str "["
                                        (->> (u/restate-server-nodes opts)
                                             (map (fn [n] (str "http://" n ":5122")))
@@ -134,17 +135,21 @@
             :--node-name node-name
             :--force-node-id node-id
             :--auto-provision (if (= node-id 1) "true" "false")
-            :--config-file "/config.toml"))
+            :--config-file "/config.toml")
 
-         (u/wait-for-container "restate")
-         (u/await-url "http://localhost:9070/health")
+           (u/wait-for-container "restate")
+           (u/await-url "http://localhost:9070/health")
 
-         (info "Waiting for all nodes to join cluster and partitions to be configured...")
-         (u/wait-for-partition-leaders (:num-partitions opts))
-         (u/wait-for-partition-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts))))
+           (info "Waiting for partition processors to come up (expecting " (:num-partitions opts) " leaders and " expected-followers " followers)")
+           (u/wait-for-partition-leaders (:num-partitions opts))
+           (u/wait-for-partition-followers expected-followers)
+           (info "restatectl reports "
+             (u/get-partition-processor-leader-count)
+             (u/get-partition-processor-follower-count)
+             " partition leaders/followers, resp."))
 
          (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :partitions :list))
-         (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :status))
+         (info "Restate cluster status: " (c/exec :docker :exec :restate :restatectl :status :--extra))
          (info "Restate whoami: " (c/exec :docker :exec :restate :restate :whoami))
          (u/await-url "http://localhost:9070/health")
 
