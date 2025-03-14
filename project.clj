@@ -11,7 +11,7 @@
   :description "Restate Jepsen tests"
   :main restate.jepsen
   :dependencies [[org.clojure/clojure "1.12.0"]
-                 [jepsen/jepsen "0.3.7"]
+                 [jepsen/jepsen "0.3.8"]
                  [hato "1.0.0"]
                  [cheshire "5.13.0"]]
   :repl-options {:init-ns jepsen.restate}
