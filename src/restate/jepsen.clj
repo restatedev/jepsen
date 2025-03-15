@@ -103,6 +103,10 @@
            (c/exec :docker :tag (:image test) "restate"))
 
          (c/upload (str "resources/" (:restate-config-toml test)) restate-config)
+
+         (info "Synchronizing with other nodes...")
+         (.await (:barrier test) 60 java.util.concurrent.TimeUnit/SECONDS)
+
          (info node "Starting Restate server container")
          (let [node-name (get-node-name (:nodes test) node)
                node-id (inc (.indexOf (:nodes test) node))
@@ -265,6 +269,7 @@
             :name            (str "restate-" (name (:workload opts)))
             :cluster-name    (str "jepsen-" unique-id)
             :db              (cluster-setup (restate opts) (app-server opts))
+            :barrier         (java.util.concurrent.CyclicBarrier. (u/restate-server-node-count opts))
             :client          (:client workload)
             :nemesis         (get nemeses (:nemesis opts))
             :generator       (if (or

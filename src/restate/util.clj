@@ -65,7 +65,8 @@
   (util/await-fn
    (fn [] (or (= (get-partition-processor-leader-count) expected-count)
               (throw+ {:type :restate-pp-not-ready})))
-   {:log-message (str "Waiting for" expected-count "leader partition processors...")
+   {:log-message (str "Waiting for" expected-count "leader partition processors: "
+                      (restatectl :partitions :list))
     :log-interval 0}))
 
 (defn get-deployments-count []
@@ -76,7 +77,8 @@
   (util/await-fn
    (fn [] (or (= (get-partition-processor-follower-count) expected-count)
               (throw+ {:type :restate-pp-not-ready})))
-   {:log-message (str "Waiting for" expected-count "follower partition processors...")
+   {:log-message (str "Waiting for" expected-count "follower partition processors: "
+                      (restatectl :partitions :list))
     :log-interval 0}))
 
 (defn await-tcp-port
