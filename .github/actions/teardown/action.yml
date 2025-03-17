@@ -4,6 +4,9 @@ inputs:
   clusterName:
     description: 'Jepsen workers cluster AWS stack name'
     required: true
+  bucketName:
+    description: "Storage bucket for cluster - will be created on-demand if unset"
+    required: false
 
 runs:
   using: "composite"
@@ -12,4 +15,4 @@ runs:
     - name: Destroy cluster
       shell: bash
       working-directory: ./jepsen
-      run: just destroy-aws-cluster "${{ inputs.clusterName }}"
+      run: just destroy-aws-cluster "${{ inputs.clusterName }}" "${{ inputs.bucketName }}"
