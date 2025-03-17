@@ -22,6 +22,9 @@ inputs:
   clusterName:
     description: "Jepsen workers cluster AWS stack name"
     required: true
+  bucketName:
+    description: "Storage bucket for cluster - will be created on-demand if unset"
+    required: false
   testConfig:
     description: "Jepsen test run configuration"
     required: false
@@ -83,4 +86,4 @@ runs:
       working-directory: ./${{ inputs.workDir }}
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
-        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32"
+        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32" "${{ inputs.bucketName }}"
