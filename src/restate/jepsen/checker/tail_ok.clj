@@ -45,12 +45,15 @@
          (filter some?)
          (into #{}))))
 
-(defn all-nodes-ok-after-final-heal []
+(defn all-nodes-ok-after-final-heal
+  "A liveness checker that fails if the test doesn't end with at least some number of
+  :ok events on each node after the last nemesis cycle has ended."
+  []
   (reify checker/Checker
     (check [_this _test history _opts]
       ;; Check the tail of event history after the final nemesis stop event; we expect
-      ;; the cluster to have healed and to end on 3 successful (:ok) responses per node.
-      (let [tail-responses-per-node 3
+      ;; the cluster to have healed and to end on some successful (:ok) responses per node.
+      (let [tail-responses-per-node 5
             nodes-with-errors (check-nodes history tail-responses-per-node)]
         (if (seq nodes-with-errors)
           {:valid? false
