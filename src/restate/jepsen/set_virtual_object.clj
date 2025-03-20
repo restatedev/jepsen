@@ -22,7 +22,7 @@
     [util :as u]
     [http :as hu]]
    [restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
-   [restate.jepsen.common :refer [with-retry]] ;[restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
+   [restate.jepsen.common :refer [with-retry]]
    [restate.jepsen.set-ops :refer [r w]]
    [slingshot.slingshot :refer [try+]]))
 
