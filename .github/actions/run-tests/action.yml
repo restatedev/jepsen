@@ -17,7 +17,7 @@ inputs:
   testConfig:
     description: 'Jepsen test run configuration'
     required: false
-    default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
+    default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "1000", "concurrency": "5n", "testCount": "50" }'
   workDir:
     description: "Test suite checkout location/Jepsen working directory"
     required: false
