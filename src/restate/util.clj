@@ -14,6 +14,7 @@
    [jepsen
     [control :as c]
     [util :as util]]
+   [jepsen-patched.util :refer [await-fn]]
    [slingshot.slingshot :refer [throw+]]))
 
 (defn restate [cmd & args]
@@ -103,11 +104,11 @@
   ([url]
    (await-url url {}))
   ([url opts]
-   (util/await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
-                  (merge {:log-message (str "Waiting for " url "...")
-                          :log-interval 5000
-                          :timeout (* 60 1000)}
-                         opts))))
+   (await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
+             (merge {:log-message (str "Waiting for " url "...")
+                     :log-interval 2000
+                     :timeout (* 60 1000)}
+                    opts))))
 
 (defn await-service-deployment []
   (util/await-fn

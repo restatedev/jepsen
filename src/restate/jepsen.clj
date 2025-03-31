@@ -145,7 +145,10 @@
             :--config-file "/config.toml")
 
            (u/wait-for-container "restate")
-           (u/await-url "http://localhost:9070/health")
+           (u/await-url "http://localhost:9070/health"
+                        {:timeout (* 3 60 1000)
+                         :status-fn (fn [_opts] (info "Restate cluster status:\n" (u/restatectl :status :--extra :|| :true)))})
+
            (info (u/restate :whoami))
 
            (info "Waiting for partition processors to become active (expecting"

@@ -1,9 +1,9 @@
 roles = ["admin", "metadata-server", "worker", "log-server"]
 tracing-filter = "info"
-log-filter = "restate=debug,info"
+log-filter = "restate=debug,slog=debug,info"
 log-format = "compact"
 log-disable-ansi-codes = true
-rocksdb-total-memory-size = "100 MB"
+rocksdb-total-memory-size = "1 GB"
 
 [admin]
 heartbeat-interval = "1s"
@@ -13,8 +13,14 @@ log-tail-update-interval = "3s"
 
 [metadata-server]
 type = "replicated"
+raft-election-tick = 10
+raft-heartbeat-tick = 2
+raft-tick-interval = "100ms"
+status-update-interval = "1s"
 
 [metadata-client]
+type = "replicated"
+addresses = ["http://127.0.0.1:5122/"] # env-overridden
 connect-timeout = "1s"
 keep-alive-interval = "1s"
 keep-alive-timeout = "1s"
