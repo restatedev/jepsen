@@ -25,10 +25,6 @@ inputs:
   bucketName:
     description: "Storage bucket for cluster - will be created on-demand if unset"
     required: false
-  testConfig:
-    description: "Jepsen test run configuration"
-    required: false
-    default: '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "10", "concurrency": "5n", "testCount": "1" }'
   workDir:
     description: "Test suite checkout location/Jepsen working directory"
     required: false
