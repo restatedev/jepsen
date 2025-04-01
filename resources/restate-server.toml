@@ -1,13 +1,13 @@
 roles = ["admin", "metadata-server", "worker", "log-server"]
 tracing-filter = "info"
-log-filter = "restate=debug,slog=debug,info"
+log-filter = "restate_admin=trace,restate=debug,slog=debug,info"
 log-format = "compact"
 log-disable-ansi-codes = true
 rocksdb-total-memory-size = "1 GB"
+default-replication = 2
 
 [admin]
 heartbeat-interval = "1s"
-default-partition-replication = "everywhere"
 log-trim-check-interval = "5s"
 log-tail-update-interval = "3s"
 

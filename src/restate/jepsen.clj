@@ -110,9 +110,6 @@
          (info node "Starting Restate server container")
          (let [node-name (get-node-name (:nodes test) node)
                node-id (inc (.indexOf (:nodes test) node))
-               replication-factor (->>
-                                   (/ (u/restate-server-node-count opts) 2) m/floor int inc)
-               expected-followers (* (:num-partitions opts) (dec (u/restate-server-node-count opts)))
                metadata-addresses (str "["
                                        (->> (u/restate-server-nodes opts)
                                             (map (fn [n] (str "http://" n ":5122")))
@@ -134,7 +131,6 @@
             (docker-env (merge {:RESTATE_DEFAULT_NUM_PARTITIONS (:num-partitions opts)
                                 :RESTATE_METADATA_CLIENT__ADDRESSES metadata-addresses
                                 :RESTATE_ADVERTISED_ADDRESS (str "http://" node ":5122")
-                                :RESTATE_BIFROST__REPLICATED_LOGLET__DEFAULT_LOG_REPLICATION (str "{node: " replication-factor "}")
                                 :DO_NOT_TRACK "true"}
                                (:additional-env test)))
             (:image test)
@@ -145,16 +141,16 @@
             :--config-file "/config.toml")
 
            (u/wait-for-container "restate")
-           (u/await-url "http://localhost:9070/health"
+           (u/await-url "http://localhost:5122/health"
                         {:timeout (* 3 60 1000)
-                         :status-fn (fn [_opts] (info "Restate cluster status:\n" (u/restatectl :status :--extra :|| :true)))})
+                         :status-fn (fn [_] (info "Restate cluster status:\n" (u/restatectl :status :--extra :|| :true)))})
 
            (info (u/restate :whoami))
 
            (info "Waiting for partition processors to become active (expecting"
-                 (:num-partitions opts) "leader(s) and" expected-followers "follower(s))")
+                 (:num-partitions opts) "leader(s) and" (:num-partitions opts) "follower(s))")
            (u/wait-for-partition-leaders (:num-partitions opts))
-           (u/wait-for-partition-followers expected-followers))
+           (u/wait-for-partition-followers (:num-partitions opts)))
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")

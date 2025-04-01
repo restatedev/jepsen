@@ -63,24 +63,24 @@
   (get-partition-processors-count "Follower.*Active"))
 
 (defn wait-for-partition-leaders [expected-count]
-  (util/await-fn
+  (await-fn
    (fn [] (or (= (get-partition-processor-leader-count) expected-count)
               (throw+ {:type :restate-pp-not-ready})))
-   {:log-message (str "Waiting for" expected-count "leader partition processors: "
-                      (restatectl :partitions :list))
-    :log-interval 0}))
+   {:status-fn (fn [_] (info "Waiting for" expected-count "leader partition processors:\n"
+                             (restatectl :partitions :list :|| :true)))
+    :log-interval 5000}))
 
 (defn get-deployments-count []
   (-> (restate :deployments :list :| :grep "Active" :| :wc :-l)
       Integer/parseInt))
 
 (defn wait-for-partition-followers [expected-count]
-  (util/await-fn
+  (await-fn
    (fn [] (or (= (get-partition-processor-follower-count) expected-count)
               (throw+ {:type :restate-pp-not-ready})))
-   {:log-message (str "Waiting for" expected-count "follower partition processors: "
-                      (restatectl :partitions :list))
-    :log-interval 0}))
+   {:status-fn (fn [_] (info "Waiting for" expected-count "follower partition processors:\n"
+                             (restatectl :partitions :list :|| :true)))
+    :log-interval 5000}))
 
 (defn await-tcp-port
   ;; copy of the built-in Jepsen one with ability to set custom host
@@ -105,8 +105,8 @@
    (await-url url {}))
   ([url opts]
    (await-fn (fn [] (c/exec :curl :--fail :--silent :--show-error :--location url))
-             (merge {:log-message (str "Waiting for " url "...")
-                     :log-interval 2000
+             (merge {:log-message (str "Waiting for " url " to report healthy")
+                     :log-interval 5000
                      :timeout (* 60 1000)}
                     opts))))
 

@@ -22,7 +22,7 @@
   ([f]
    (await-fn f {}))
   ([f opts]
-   (let [log-message    (:log-message opts (str "Waiting for " f "..."))
+   (let [log-message    (:log-message opts)
          status-fn      (:status-fn opts (fn [_opts]))
          retry-interval (long (:retry-interval opts 1000))
          log-interval   (:log-interval opts retry-interval)
@@ -43,8 +43,8 @@
 
                        ; Should we log something?
                        (when (<= @log-deadline now)
-                         (info log-message)
-                         (try+ (status-fn opts))
+                         (when log-message (info log-message))
+                         (when status-fn (try+ (status-fn opts)))
                          (swap! log-deadline + (* log-interval 1e6)))
 
                        ; Right, sleep and retry
