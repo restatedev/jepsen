@@ -76,7 +76,7 @@ jobs:
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ inputs.restateCommit }}
-        testConfig: ${{ inputs.testConfig || '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "1000", "concurrency": "5n", "testCount": "50" }' }}
+        testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo","nemeses":"partition-random-node","duration":"60","rate":"1000","concurrency":"5n","testCount":"50"}' }}
 
     - uses: aws-actions/configure-aws-credentials@v4
       with:
