@@ -117,5 +117,5 @@ runs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: jepsen-run-$(date -u +"%Y-%m-%d")-${{ github.run_id }}
+        name: jepsen-run-${{ github.event.repository.updated_at}}-${{ github.run_id }}
         path: ./${{ inputs.workDir }}/store
