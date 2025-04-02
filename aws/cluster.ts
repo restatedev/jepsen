@@ -18,7 +18,7 @@ const stackName =
   app.node.tryGetContext("stack-name") || `restate-jepsen-cluster-${process.env.ENV_SUFFIX ?? process.env.USER}`;
 const controlNodeSource = app.node.tryGetContext("allow-source-cidr") ?? "0.0.0.0/0";
 const nodes = 3;
-const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.SMALL);
+const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.SMALL); // x86_64 to match Restate's Docker CI artifacts
 // if you have existing buckets, pass their names into the stack and the workers will be granted access;
 // if unset, unique buckets will be created as part of deploying the stack
 const bucketName = app.node.tryGetContext("bucket-name");

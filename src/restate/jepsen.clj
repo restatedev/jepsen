@@ -9,7 +9,6 @@
 
 (ns restate.jepsen
   (:require
-   [clojure.math :as m]
    [clojure.string :as str]
    [clojure.tools.logging :refer [info]]
    [jepsen
