@@ -84,7 +84,7 @@
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
                                 :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))
-   :heal-time 20})
+   :heal-time 10})
 
 (defn workload-s3
   "Restate Metadata Store-backed Set test workload, using the object-store backend."
