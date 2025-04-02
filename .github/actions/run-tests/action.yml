@@ -55,6 +55,20 @@ runs:
         echo "Using Restate image: \`${JEPSEN_RESTATE_IMAGE}\`" >> $GITHUB_STEP_SUMMARY
         echo >> $GITHUB_STEP_SUMMARY
 
+        echo "Checking for node connectivity..."
+        while IFS= read -r node || [[ -n "$node" ]]; do
+          if [[ -n "$node" && ! "$node" =~ ^[[:space:]]*# ]]; then
+            echo -n "  Checking $node... "
+            if timeout 120 bash -c "</dev/tcp/$node/22" 2>/dev/null; then
+              echo "✅ Reachable"
+            else
+              echo "❌ Failed to connect"
+              echo "::error::Cannot connect to SSH port on $node"
+              exit 1
+            fi
+          fi
+        done < aws/nodes.txt
+
         OVERALL_STATUS=0
 
         RESULTS_TABLE=results-table.md
