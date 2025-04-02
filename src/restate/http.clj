@@ -15,4 +15,4 @@
 
 (defn defaults [client] {:http-client client
                          :content-type :json
-                         :timeout 2000})
+                         :timeout 5000})
