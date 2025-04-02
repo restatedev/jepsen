@@ -1,18 +1,15 @@
 roles = ["admin", "worker", "log-server"]
 tracing-filter = "info"
-log-filter = "restate=debug,info"
+log-filter = "restate=debug,slog=debug,info"
 log-format = "compact"
 log-disable-ansi-codes = true
-rocksdb-total-memory-size = "100 MB"
+rocksdb-total-memory-size = "1 GB"
+default-replication = 2
 
 [admin]
 heartbeat-interval = "1s"
-default-partition-replication = "everywhere"
 log-trim-check-interval = "5s"
 log-tail-update-interval = "3s"
-
-[metadata-server]
-type = "replicated"
 
 [metadata-client]
 type = "object-store"
@@ -31,3 +28,6 @@ connect-timeout = "1s"
 handshake-timeout = "1s"
 http2-keep-alive-interval = "1s"
 http2-keep-alive-timeout = "1s"
+
+[worker.invoker]
+concurrent-invocations-limit = 1000

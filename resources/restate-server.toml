@@ -1,6 +1,6 @@
 roles = ["admin", "metadata-server", "worker", "log-server"]
 tracing-filter = "info"
-log-filter = "restate_admin=trace,restate=debug,slog=debug,info"
+log-filter = "restate=debug,slog=debug,info"
 log-format = "compact"
 log-disable-ansi-codes = true
 rocksdb-total-memory-size = "1 GB"
@@ -20,7 +20,7 @@ status-update-interval = "1s"
 
 [metadata-client]
 type = "replicated"
-addresses = ["http://127.0.0.1:5122/"] # env-overridden
+addresses = ["http://127.0.0.1:5122/"] # set via environment
 connect-timeout = "1s"
 keep-alive-interval = "1s"
 keep-alive-timeout = "1s"
@@ -38,3 +38,6 @@ connect-timeout = "1s"
 handshake-timeout = "1s"
 http2-keep-alive-interval = "1s"
 http2-keep-alive-timeout = "1s"
+
+[worker.invoker]
+concurrent-invocations-limit = 1000
