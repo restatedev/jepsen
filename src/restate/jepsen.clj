@@ -212,6 +212,7 @@
   {"set-mds"      set-mds/workload
    "set-mds-s3"   set-mds/workload-s3
    "set-vo"       set-vo/workload
+   "set-vo-s3"    set-vo/workload-s3
    "register-mds" register-mds/workload
    "register-vo"  register-vo/workload})
 
@@ -236,13 +237,14 @@
                                [:resumed "restate-server"]))
    "nuke-partition-state"  (nemesis/node-start-stopper
                             rand-nth
-                            (fn start [_t _n]
+                            (fn start [test node]
+                              (info "Starting nemesis on node:" node (str "n" (inc (.indexOf (:nodes test) node))) <)
                               (c/su (c/exec :docker :kill :-s :KILL "restate")
-                                    (c/exec :rm :-rf "/opt/restate/restate-data/n1/db/"))
-                              [:killed "restate-server"])
-                            (fn stop [_t _n]
-                              (c/su (c/exec :docker :start "restate"))
-                              [:restarted "restate-server"]))
+                                    (c/exec :mv (str "/opt/restate/restate-data/" "n" (inc (.indexOf (:nodes test) node)) "/db/")
+                                            (str "/opt/restate/restate-data/" "n" (inc (.indexOf (:nodes test) node)) "/db." (inst-ms (java.util.Date.))))
+                                    (c/su (c/exec :docker :start "restate")))
+                              [:nuked-partition-state "restate-server"])
+                            (fn stop [_t _n] [:no-op]))
    "partition-random-node" (nemesis/partition-random-node)})
 
 (defn restate-test
@@ -310,6 +312,7 @@
     :default "none"
     :validate (nemeses (cli/one-of nemeses))]
    [nil "--metadata-bucket NAME" "[Optional] Bucket to use for object-store metadata backend"]
+   [nil "--snapshot-bucket NAME" "[Optional] Bucket to use for partition snapshots"]
    ;; By default the cluster is homogeneous - all nodes run restate-server as well as the SDK services.
    ;; This option allows us to separate the SDK services to only run on dedicated nodes.
    [nil "--dedicated-service-nodes N" "Number of dedicated service hosting nodes."

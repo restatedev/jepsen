@@ -81,3 +81,17 @@
                                 :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))
    :heal-time 30})
+
+(defn workload-s3
+  "Restate service-backed Set test workload with snapshots."
+  [opts]
+  (let [snapshot-bucket (:snapshot-bucket opts)]
+    {:client    (SetServiceClient. "jepsen-set" opts)
+     :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
+                                  :heal (all-nodes-ok-after-final-heal)})
+     :generator (gen/reserve 5 (repeat (r)) (w))
+     :heal-time 30
+     :workload-opts {:additional-env
+                     {:RESTATE_WORKER__SNAPSHOTS__DESTINATION (str "s3://" snapshot-bucket "/snapshots-" (:unique-id opts))
+                      :RESTATE_WORKER__SNAPSHOTS__SNAPSHOT_INTERVAL_NUM_RECORDS "100"
+                      :RESTATE_ADMIN__LOG_TRIM_CHECK_INTERVAL "1s"}}}))
