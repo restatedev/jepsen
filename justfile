@@ -26,6 +26,7 @@ run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restat
   lein run test --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
     --image {{image}} \
     --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
+    --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
     --leave-db-running true \
     --time-limit 120 --rate 10 --concurrency 5n --test-count 1 \
     --workload {{workload}} --nemesis {{nemesis}}

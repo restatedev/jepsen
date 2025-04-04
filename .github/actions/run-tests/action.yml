@@ -84,6 +84,7 @@ runs:
               --nodes-file aws/nodes.txt \
               --username admin \
               --ssh-private-key aws/private-key.pem \
+              --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
               --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
               --workload ${WORKLOAD} --nemesis ${NEMESIS} \
               --image ${JEPSEN_RESTATE_IMAGE} \
