@@ -8,6 +8,7 @@ default-replication = 2
 
 [admin]
 heartbeat-interval = "1s"
+metadata-sync-interval = "1s"
 log-trim-check-interval = "5s"
 log-tail-update-interval = "3s"
 
