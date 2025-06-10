@@ -170,7 +170,7 @@
     (log-files [_this test _node]
       (when (not (:dummy? (:ssh test)))
         (c/su (c/exec* "docker logs restate" "&>" restate-logfile "|| true")
-              (c/exec :chmod :644 restate-logfile))
+              (c/exec* :chmod :644 restate-logfile "|| true"))
         [restate-logfile]))))
 
 (defn app-server

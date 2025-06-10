@@ -11,20 +11,20 @@ on:
         description: "Git ref for test suite"
         required: false
         default: 'main'
-      restateImageId:
-        description: 'Restate image (ignored if PR# set)'
-        required: false
-        default: 'ghcr.io/restatedev/restate:main'
-        type: string
       restatePr:
-        description: 'Use CI Docker image from PR# (ignored if commit id is set)'
+        description: 'Use CI Docker artifact from restate PR# (ignored if commit id is set)'
         required: false
         default: ''
         type: string
       restateCommit:
-        description: 'Use CI Docker image from commit id'
+        description: 'Use CI Docker artifact from restate commit id'
         required: false
         default: ''
+        type: string
+      restateImageId:
+        description: 'Restate Docker image (ignored if PR# set)'
+        required: false
+        default: 'ghcr.io/restatedev/restate:main'
         type: string
       testConfig:
         description: 'JSON object containing all test parameters'
