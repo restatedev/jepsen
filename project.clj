@@ -11,9 +11,9 @@
   :description "Restate Jepsen tests"
   :main restate.jepsen
   :dependencies [[org.clojure/clojure "1.12.0"]
-                 [jepsen/jepsen "0.3.8"]
+                 [jepsen/jepsen "0.3.9"]
                  [hato "1.0.0"]
-                 [cheshire "5.13.0"]]
+                 [cheshire "6.0.0"]]
   :repl-options {:init-ns jepsen.restate}
   :jvm-opts ["-Xmx8g"
              "-server"
