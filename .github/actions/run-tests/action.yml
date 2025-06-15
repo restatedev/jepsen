@@ -92,7 +92,8 @@ runs:
               --rate ${{ fromJSON(inputs.testConfig).rate || 10 }} \
               --concurrency ${{ fromJSON(inputs.testConfig).concurrency || '5n' }} \
               --test-count ${{ fromJSON(inputs.testConfig).testCount || '1' }} \
-              --leave-db-running ${{ inputs.retainCluster || 'false' }}
+              --leave-db-running ${{ inputs.retainCluster || 'false' }} \
+              | grep -Fv ' jepsen.util '
 
             if [ $? -ne 0 ]; then
               OVERALL_STATUS=1
