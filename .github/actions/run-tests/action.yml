@@ -72,9 +72,9 @@ runs:
         OVERALL_STATUS=0
 
         RESULTS_TABLE=results-table.md
-        echo "Test Results Summary" >> ${RESULTS_TABLE}
-        echo "| Workload | Nemesis | Status |" >> ${RESULTS_TABLE}
-        echo "| --- | --- | --- |" >> ${RESULTS_TABLE}
+        echo "Test Results Summary" > ${RESULTS_TABLE}
+        echo "| Workload | Nemesis | Run | Status |" >> ${RESULTS_TABLE}
+        echo "| --- | --- | --- | --- |" >> ${RESULTS_TABLE}
 
         for WORKLOAD in ${{ fromJSON(inputs.testConfig).workloads || 'set-vo' }}; do
           for NEMESIS in ${{ fromJSON(inputs.testConfig).nemeses || 'partition-random-node' }}; do
@@ -103,9 +103,23 @@ runs:
               TEST_STATUS="✅"
             fi
 
-            echo "${WORKLOAD} | ${NEMESIS} | ${TEST_STATUS}" >> ${RESULTS_TABLE}
-            echo "<details><summary>$(tail -1 store/latest/jepsen.log)</summary><pre>" > details-${WORKLOAD}-${NEMESIS}.md
-            grep -A 9999 "Analysis complete" store/latest/jepsen.log >> details-${WORKLOAD}-${NEMESIS}.md
+            # Extract test run timestamp from symlink target
+            RUN_ID=$(readlink store/latest)
+            if [ -f store/latest/jepsen.log ]; then
+              TEST_RESULT=$(tail -10 store/latest/jepsen.log | grep -E "(Everything looks good|Analysis invalid)" | tail -1 || echo "Test incomplete")
+            else
+              TEST_RESULT="No log found"
+            fi
+
+            echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_ID} | ${TEST_STATUS} |" >> ${RESULTS_TABLE}
+
+            # Create detailed results for this specific test
+            echo "<details><summary>${TEST_RESULT}</summary><pre>" >> details-${WORKLOAD}-${NEMESIS}.md
+            if [ -f store/latest/jepsen.log ]; then
+              grep -A 50 -B 5 "Analysis complete\|Test crashed!\|Everything looks good\|Analysis invalid" store/latest/jepsen.log | tail -100 >> details-${WORKLOAD}-${NEMESIS}.md
+            else
+              echo "No jepsen.log file found" >> details-${WORKLOAD}-${NEMESIS}.md
+            fi
             echo "</pre></details>" >> details-${WORKLOAD}-${NEMESIS}.md
 
             echo "::endgroup::"
