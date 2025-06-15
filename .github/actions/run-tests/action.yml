@@ -72,9 +72,9 @@ runs:
         OVERALL_STATUS=0
 
         RESULTS_TABLE=results-table.md
-        echo "Test Results Summary" >> ${RESULTS_TABLE}
-        echo "| Workload | Nemesis | Status |" >> ${RESULTS_TABLE}
-        echo "| --- | --- | --- |" >> ${RESULTS_TABLE}
+        echo "Test Results Summary" > ${RESULTS_TABLE}
+        echo "| Workload | Nemesis | Run | Status |" >> ${RESULTS_TABLE}
+        echo "| --- | --- | --- | --- |" >> ${RESULTS_TABLE}
 
         for WORKLOAD in ${{ fromJSON(inputs.testConfig).workloads || 'set-vo' }}; do
           for NEMESIS in ${{ fromJSON(inputs.testConfig).nemeses || 'partition-random-node' }}; do
@@ -103,9 +103,12 @@ runs:
               TEST_STATUS="✅"
             fi
 
-            echo "${WORKLOAD} | ${NEMESIS} | ${TEST_STATUS}" >> ${RESULTS_TABLE}
-            echo "<details><summary>$(tail -1 store/latest/jepsen.log)</summary><pre>" > details-${WORKLOAD}-${NEMESIS}.md
-            grep -A 9999 "Analysis complete" store/latest/jepsen.log >> details-${WORKLOAD}-${NEMESIS}.md
+            /// FREEZE BLOCK: we only extract the details once and overwrite them, but there are in fact many
+            /// individual workload test reports under store - latest just points to the one that just finished
+
+            echo "| ${WORKLOAD} | ${NEMESIS} | $(ls -ld store/latest) | ${TEST_STATUS} |" >> ${RESULTS_TABLE}
+            echo "<details><summary>$(tail -1 store/latest/jepsen.log)</summary><pre>" >> details-${WORKLOAD}-${NEMESIS}.md
+            grep -A 100 "Analysis complete|Test crashed!" store/latest/jepsen.log >> details-${WORKLOAD}-${NEMESIS}.md
             echo "</pre></details>" >> details-${WORKLOAD}-${NEMESIS}.md
 
             echo "::endgroup::"
