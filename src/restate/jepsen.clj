@@ -125,6 +125,7 @@
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             ;; :--add-host :host.docker.internal:host-gateway ;; podman doesn't support this
             :--detach
+            :--log-driver=k8s-file :--log-opt=max-size=10m :--log-opt=max-file=5
             :--volume (str restate-config ":/config.toml")
             :--volume "/opt/restate/restate-data:/restate-data"
             (docker-env (merge {:RESTATE_DEFAULT_NUM_PARTITIONS (:num-partitions opts)
