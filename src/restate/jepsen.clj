@@ -144,7 +144,7 @@
                         {:timeout (* 3 60 1000)
                          :status-fn (fn [_] (info "Restate cluster status:\n" (u/restatectl :status :--extra :|| :true)))})
 
-           (info (u/restate :whoami))
+           (info (c/exec* "docker logs restate | head -50 | grep -o 'Starting Restate Server .*$'"))
 
            (info "Waiting for partition processors to become active (expecting"
                  (:num-partitions opts) "leader(s) and" (:num-partitions opts) "follower(s))")
@@ -157,11 +157,12 @@
            (u/restate :deployments :register (app-service-url opts) :--yes)
            (info "Restate cluster status:\n" (u/restatectl :status :--extra)))
 
-         (u/await-service-deployment))))
+         (u/await-service-deployment)
+         (info "Setup complete on" (c/exec :hostname)))))
 
     (teardown! [_this test node]
       (when (not (:dummy? (:ssh test)))
-        (info node "Tearing down Restate")
+        (info node "Tearing down Restate on" (c/exec :hostname))
         (c/su
          (c/exec :rm :-rf restate-root)
          (c/exec :docker :rm :-f "restate" :|| :true))))
@@ -296,7 +297,8 @@
                                :stats      (checker/stats)
                                :exceptions (checker/unhandled-exceptions)
                                :timeline   (timeline/html)
-                               :workload   (:checker workload)})})))
+                               :workload   (:checker workload)})
+            :logging {:console false}})))
 
 (def cli-opts
   "Additional command line options."
