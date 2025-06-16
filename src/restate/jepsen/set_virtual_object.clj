@@ -80,7 +80,7 @@
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
                                 :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))
-   :heal-time 60})
+   :heal-time 20})
 
 (defn workload-s3
   "Restate service-backed Set test workload with snapshots."
