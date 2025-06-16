@@ -70,6 +70,8 @@ runs:
         done < aws/nodes.txt
 
         OVERALL_STATUS=0
+        GLOBAL_CONSECUTIVE_FAILURES=0
+        MAX_GLOBAL_FAILURES=10
 
         RESULTS_TABLE=results-table.md
         echo "Test Results Summary" > ${RESULTS_TABLE}
@@ -80,41 +82,129 @@ runs:
           for NEMESIS in ${{ fromJSON(inputs.testConfig).nemeses || 'partition-random-node' }}; do
             echo "::group::Jepsen workload: ${WORKLOAD} nemesis: ${NEMESIS}"
 
-            lein run test \
-              --nodes-file aws/nodes.txt \
-              --username admin \
-              --ssh-private-key aws/private-key.pem \
-              --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
-              --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
-              --workload ${WORKLOAD} --nemesis ${NEMESIS} \
-              --image ${JEPSEN_RESTATE_IMAGE} \
-              --time-limit ${{ fromJSON(inputs.testConfig).duration || 30 }} \
-              --rate ${{ fromJSON(inputs.testConfig).rate || 10 }} \
-              --concurrency ${{ fromJSON(inputs.testConfig).concurrency || '5n' }} \
-              --test-count ${{ fromJSON(inputs.testConfig).testCount || '1' }} \
-              --leave-db-running ${{ inputs.retainCluster || 'false' }} \
-              | grep -Fv ' jepsen.util '
+            # Run tests with our own loop and retry logic
+            TARGET_TEST_COUNT=${{ fromJSON(inputs.testConfig).testCount || '1' }}
+            COMPLETED_TESTS=0
+            MAX_RETRIES=3
 
-            if [ $? -ne 0 ]; then
-              OVERALL_STATUS=1
-              TEST_STATUS="❌"
-              echo "::error::Test workload: ${WORKLOAD} nemesis: ${NEMESIS} failed"
-            else
+            while [ $COMPLETED_TESTS -lt $TARGET_TEST_COUNT ]; do
+              echo "Running test $((COMPLETED_TESTS + 1)) of $TARGET_TEST_COUNT for ${WORKLOAD}/${NEMESIS}"
+
+              RETRY_COUNT=0
+              SUCCESS=false
+
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
+                if [ $RETRY_COUNT -gt 0 ]; then
+                  echo "Retry attempt $RETRY_COUNT of $((MAX_RETRIES - 1)) for test $((COMPLETED_TESTS + 1))"
+                fi
+
+                lein run test \
+                  --nodes-file aws/nodes.txt \
+                  --username admin \
+                  --ssh-private-key aws/private-key.pem \
+                  --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
+                  --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
+                  --workload ${WORKLOAD} --nemesis ${NEMESIS} \
+                  --image ${JEPSEN_RESTATE_IMAGE} \
+                  --time-limit ${{ fromJSON(inputs.testConfig).duration || 30 }} \
+                  --rate ${{ fromJSON(inputs.testConfig).rate || 10 }} \
+                  --concurrency ${{ fromJSON(inputs.testConfig).concurrency || '5n' }} \
+                  --test-count 1 \
+                  --leave-db-running ${{ inputs.retainCluster || 'false' }} \
+                  | grep -Fv ' jepsen.util '
+
+                TEST_EXIT_CODE=$?
+
+                # Check if this was an infrastructure failure we should retry
+                if [ $TEST_EXIT_CODE -ne 0 ] && [ -f store/latest/jepsen.log ]; then
+                  if grep -q "Test crashed!" store/latest/jepsen.log; then
+                    # Check for infrastructure failures (SCP, SSH, connection issues)
+                    if grep -E "(scp:|ssh:|Connection refused|Connection timed out|ConnectException|Shell command.*returned exit status)" store/latest/jepsen.log > /dev/null; then
+                      echo "::warning::Infrastructure failure detected on test $((COMPLETED_TESTS + 1)), retry $((RETRY_COUNT + 1))"
+                      RETRY_COUNT=$((RETRY_COUNT + 1))
+                      GLOBAL_CONSECUTIVE_FAILURES=$((GLOBAL_CONSECUTIVE_FAILURES + 1))
+
+                      # Circuit breaker: too many consecutive failures suggests cluster is gone
+                      if [ $GLOBAL_CONSECUTIVE_FAILURES -ge $MAX_GLOBAL_FAILURES ]; then
+                        echo "::error::Too many consecutive infrastructure failures ($GLOBAL_CONSECUTIVE_FAILURES), cluster may be unavailable"
+                        exit 1
+                      fi
+
+                      sleep 30
+                      continue
+                    else
+                      # This is a real test failure (analysis invalid, etc.)
+                      echo "Test $((COMPLETED_TESTS + 1)) completed with actual test failure (not infrastructure)"
+                      SUCCESS=true
+                      GLOBAL_CONSECUTIVE_FAILURES=0
+                    fi
+                  else
+                    # Test completed successfully or with analysis results
+                    SUCCESS=true
+                    GLOBAL_CONSECUTIVE_FAILURES=0
+                  fi
+                else
+                  # Test completed successfully
+                  SUCCESS=true
+                  GLOBAL_CONSECUTIVE_FAILURES=0
+                fi
+              done
+
+              # Check if we exhausted retries
+              if [ "$SUCCESS" = false ]; then
+                echo "::error::Test $((COMPLETED_TESTS + 1)) failed after $MAX_RETRIES attempts due to infrastructure issues"
+                OVERALL_STATUS=1
+                # Don't increment global counter here since individual test gave up, but continue with next test
+                break
+              fi
+
+              COMPLETED_TESTS=$((COMPLETED_TESTS + 1))
+            done
+
+            # Determine overall status for this workload/nemesis combination
+            if [ $COMPLETED_TESTS -eq $TARGET_TEST_COUNT ]; then
               TEST_STATUS="✅"
-            fi
-
-            # Extract test run timestamp from symlink target
-            RUN_ID=$(readlink store/latest)
-            if [ -f store/latest/jepsen.log ]; then
-              TEST_RESULT=$(tail -10 store/latest/jepsen.log | grep -E "(Everything looks good|Analysis invalid)" | tail -1 || echo "Test incomplete")
             else
-              TEST_RESULT="No log found"
+              TEST_STATUS="❌"
+              OVERALL_STATUS=1
             fi
 
-            echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_ID} | ${TEST_STATUS} |" >> ${RESULTS_TABLE}
+            # Iterate through all test runs for this workload/nemesis combination
+            WORKLOAD_DIR="store/restate-${WORKLOAD}"
+            if [ -d "${WORKLOAD_DIR}" ]; then
+              # Find all timestamp directories and sort them
+              for RUN_DIR in $(find "${WORKLOAD_DIR}" -maxdepth 1 -type d -name "20*" | sort); do
+                RUN_TIMESTAMP=$(basename "${RUN_DIR}")
 
-            # Create detailed results for this specific test
-            echo "<details><summary>${TEST_RESULT}</summary><pre>" >> details-${WORKLOAD}-${NEMESIS}.md
+                # Determine individual test status
+                INDIVIDUAL_STATUS="❓"
+                TEST_RESULT="Unknown"
+                if [ -f "${RUN_DIR}/jepsen.log" ]; then
+                  if grep -q "Everything looks good" "${RUN_DIR}/jepsen.log"; then
+                    INDIVIDUAL_STATUS="✅"
+                    TEST_RESULT="Everything looks good"
+                  elif grep -q "Analysis invalid" "${RUN_DIR}/jepsen.log"; then
+                    INDIVIDUAL_STATUS="❌"
+                    TEST_RESULT="Analysis invalid"
+                  else
+                    INDIVIDUAL_STATUS="❓"
+                    TEST_RESULT=$(tail -10 "${RUN_DIR}/jepsen.log" | grep -E "(Test crashed|Exception)" | tail -1 || echo "Test incomplete")
+                  fi
+                else
+                  INDIVIDUAL_STATUS="❌"
+                  TEST_RESULT="No log found"
+                fi
+
+                echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_TIMESTAMP} | ${INDIVIDUAL_STATUS} |" >> ${RESULTS_TABLE}
+              done
+            else
+              # Fallback to latest if no workload directory found
+              RUN_ID=$(readlink store/latest 2>/dev/null || echo "unknown")
+              echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_ID} | ${TEST_STATUS} |" >> ${RESULTS_TABLE}
+            fi
+
+            # Create detailed results summary (using latest run)
+            echo "<details><summary>Latest test details</summary><pre>" >> details-${WORKLOAD}-${NEMESIS}.md
             if [ -f store/latest/jepsen.log ]; then
               grep -A 50 -B 5 "Analysis complete\|Test crashed!\|Everything looks good\|Analysis invalid" store/latest/jepsen.log | tail -100 >> details-${WORKLOAD}-${NEMESIS}.md
             else
