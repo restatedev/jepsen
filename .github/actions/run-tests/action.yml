@@ -56,14 +56,31 @@ runs:
         echo >> $GITHUB_STEP_SUMMARY
 
         echo "Checking for node connectivity..."
+        CONNECTIVITY_MAX_RETRIES=5
+        CONNECTIVITY_RETRY_DELAY=15
+        
         while IFS= read -r node || [[ -n "$node" ]]; do
           if [[ -n "$node" && ! "$node" =~ ^[[:space:]]*# ]]; then
             echo -n "  Checking $node... "
-            if timeout 120 bash -c "</dev/tcp/$node/22" 2>/dev/null; then
-              echo "✅ Reachable"
-            else
-              echo "❌ Failed to connect"
-              echo "::error::Cannot connect to SSH port on $node"
+            
+            CONNECTIVITY_SUCCESS=false
+            for attempt in $(seq 1 $CONNECTIVITY_MAX_RETRIES); do
+              if timeout 120 bash -c "</dev/tcp/$node/22" 2>/dev/null; then
+                echo "✅ Reachable"
+                CONNECTIVITY_SUCCESS=true
+                break
+              else
+                if [ $attempt -lt $CONNECTIVITY_MAX_RETRIES ]; then
+                  echo -n "❌ Attempt $attempt failed, retrying in ${CONNECTIVITY_RETRY_DELAY}s... "
+                  sleep $CONNECTIVITY_RETRY_DELAY
+                else
+                  echo "❌ Failed to connect after $CONNECTIVITY_MAX_RETRIES attempts"
+                fi
+              fi
+            done
+            
+            if [ "$CONNECTIVITY_SUCCESS" = false ]; then
+              echo "::error::Cannot connect to SSH port on $node after $CONNECTIVITY_MAX_RETRIES attempts"
               exit 1
             fi
           fi
