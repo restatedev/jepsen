@@ -1,6 +1,6 @@
 roles = ["admin", "metadata-server", "worker", "log-server"]
 tracing-filter = "info"
-log-filter = "restate=debug,slog=debug,info"
+log-filter = "restate=info,slog=info,info"
 log-format = "compact"
 log-disable-ansi-codes = true
 rocksdb-total-memory-size = "1 GB"
