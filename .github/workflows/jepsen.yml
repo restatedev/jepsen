@@ -12,24 +12,24 @@ on:
         required: false
         default: 'main'
       restateCommit:
-        description: 'Use restatedev/restate Docker artifact from Git commit id'
+        description: 'Git commit id  (uses restatedev/restate Docker artifact)'
         required: false
         default: ''
         type: string
       restatePr:
-        description: 'Use restatedev/restate Docker artifact PR# (ignored if commit id is set)'
+        description: 'Test against PR Docker artifact (commit takes precedence)'
         required: false
         default: ''
         type: string
       restateImageId:
-        description: 'Restate Docker image (ignored if PR# if Git commit id are set)'
+        description: 'Docker image (PR#/commit take precedence; defaults to ghcr.io/restatedev/restate:main)'
         required: false
         default: 'ghcr.io/restatedev/restate:main'
         type: string
       testConfig:
-        description: 'JSON object containing all test parameters'
+        description: 'Test configuration parameters'
         required: false
-        default: '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "50" }'
+        default: '{"workloads": "set-vo set-mds set-mds-s3", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "20"}'
       retainCluster:
         description: 'Retain the AWS worker node cluster after test'
         required: false
@@ -76,7 +76,7 @@ jobs:
         restateImageId: ${{ inputs.restateImageId }}
         restatePr: ${{ inputs.restatePr }}
         restateCommit: ${{ inputs.restateCommit }}
-        testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"50"}' }}
+        testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}' }}
 
     - uses: aws-actions/configure-aws-credentials@v4
       with:
