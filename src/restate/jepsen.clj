@@ -213,6 +213,7 @@
   "A map of workloads."
   {"set-mds"      set-mds/workload
    "set-mds-s3"   set-mds/workload-s3
+   "set-mds-gcs"  set-mds/workload-gcs
    "set-vo"       set-vo/workload
    "set-vo-s3"    set-vo/workload-s3
    "register-mds" register-mds/workload
@@ -249,6 +250,23 @@
                             (fn stop [_t _n] [:no-op]))
    "partition-random-node" (nemesis/partition-random-node)})
 
+(defn get-env
+  "Wrapper for System/getenv to enable testing"
+  [var-name]
+  (System/getenv var-name))
+
+(defn aws-creds
+  "Get AWS credentials with precedence: CLI opts > environment variables
+
+   Precedence order:
+   1. CLI arguments: --access-key-id and --secret-access-key
+   2. Environment variables: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
+  [opts]
+  {:access-key-id (or (:access-key-id opts)
+                      (get-env "AWS_ACCESS_KEY_ID"))
+   :secret-access-key (or (:secret-access-key opts)
+                          (get-env "AWS_SECRET_ACCESS_KEY"))})
+
 (defn restate-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
   :concurrency ...), constructs a test map. Special options:
@@ -267,6 +285,7 @@
            {:restate-config-toml "restate-server.toml"}
            (:workload-opts workload)
            (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
+           (aws-creds opts)
            {:pure-generators true
             :name            (str "restate-" (name (:workload opts)))
             :cluster-name    (str "jepsen-" unique-id)
@@ -316,6 +335,8 @@
     :validate (nemeses (cli/one-of nemeses))]
    [nil "--metadata-bucket NAME" "[Optional] Bucket to use for object-store metadata backend"]
    [nil "--snapshot-bucket NAME" "[Optional] Bucket to use for partition snapshots"]
+   [nil "--access-key-id ID" "[Optional] Explicit access key for object store access"]
+   [nil "--secret-access-key SECRET" "[Optional] Explicit secret key for object store access"]
    ;; By default the cluster is homogeneous - all nodes run restate-server as well as the SDK services.
    ;; This option allows us to separate the SDK services to only run on dedicated nodes.
    [nil "--dedicated-service-nodes N" "Number of dedicated service hosting nodes."

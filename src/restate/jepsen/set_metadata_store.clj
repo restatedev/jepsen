@@ -78,7 +78,7 @@
  (close! [_ _test]))
 
 (defn workload
-  "Restate Metadata Store-backed Set test workload, using the replicated store backend."
+  "Restate Metadata Store-backed Set test workload, using the replicated store backend"
   [opts]
   {:client    (SetMetadatsStoreClient. "jepsen-set" opts)
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
@@ -87,7 +87,7 @@
    :heal-time 10})
 
 (defn workload-s3
-  "Restate Metadata Store-backed Set test workload, using the object-store backend."
+  "Restate Metadata Store-backed Set test workload, using the object-store backend with an S3 bucket"
   [opts]
   (let [metadata-bucket (:metadata-bucket opts)]
     (when (nil? metadata-bucket)
@@ -97,3 +97,25 @@
             {:restate-config-toml "restate-server-s3-metadata.toml"
              :additional-env
              {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))}}})))
+
+(defn workload-gcs
+  "Restate Metadata Store-backed Set test workload, using the object-store backend with a GCS bucket"
+  [opts]
+  (let [metadata-bucket (:metadata-bucket opts)
+        access-key-id (:access-key-id opts)
+        secret-access-key (:secret-access-key opts)]
+    (when (nil? metadata-bucket)
+      (throw (IllegalArgumentException. "Required parameter missing: :metadata-bucket")))
+    (when (nil? access-key-id)
+      (throw (IllegalArgumentException. "Required parameter missing: :access-key-id (use --access-key-id or AWS_ACCESS_KEY_ID environment variable)")))
+    (when (nil? secret-access-key)
+      (throw (IllegalArgumentException. "Required parameter missing: :secret-access-key (use --secret-access-key or AWS_SECRET_ACCESS_KEY environment variable)")))
+    (merge (workload opts)
+           {:workload-opts
+            {:restate-config-toml "restate-server-s3-metadata.toml"
+             :additional-env
+             {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))
+              :RESTATE_METADATA_CLIENT__AWS_ENDPOINT_URL "https://storage.googleapis.com"
+              :RESTATE_METADATA_CLIENT__AWS_REGION "auto"
+              :RESTATE_METADATA_CLIENT__AWS_ACCESS_KEY_ID access-key-id
+              :RESTATE_METADATA_CLIENT__AWS_SECRET_ACCESS_KEY secret-access-key}}})))
