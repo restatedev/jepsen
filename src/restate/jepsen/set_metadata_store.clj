@@ -119,3 +119,34 @@
               :RESTATE_METADATA_CLIENT__AWS_REGION "auto"
               :RESTATE_METADATA_CLIENT__AWS_ACCESS_KEY_ID access-key-id
               :RESTATE_METADATA_CLIENT__AWS_SECRET_ACCESS_KEY secret-access-key}}})))
+
+;; TODO: setup of the Minio server itself is not yet automated, start a server on a node as follows:
+;;
+;;   mkdir -p /minio-data/restate
+;;   docker run --detach --name minio -p 9000:9000 -p 9001:9001 -v /minio-data:/data quay.io/minio/minio server /data --console-address :9001
+;;
+;; Pass the address of the minio host to the test using: --s3-endpoint-url http://<address>:9000
+(defn workload-minio
+  "Restate Metadata Store-backed Set test workload, using the object-store backend with Minio"
+  [opts]
+  (let [metadata-bucket (:metadata-bucket opts)
+        access-key-id (:access-key-id opts)
+        secret-access-key (:secret-access-key opts)]
+    (when (nil? metadata-bucket)
+      (throw (IllegalArgumentException. "Required parameter missing: :metadata-bucket")))
+    (when (nil? access-key-id)
+      (throw (IllegalArgumentException. "Required parameter missing: :access-key-id (use --access-key-id or AWS_ACCESS_KEY_ID environment variable)")))
+    (when (nil? secret-access-key)
+      (throw (IllegalArgumentException. "Required parameter missing: :secret-access-key (use --secret-access-key or AWS_SECRET_ACCESS_KEY environment variable)")))
+    (when (nil? (:s3-endpoint-url opts))
+      (throw (IllegalArgumentException. "Required parameter missing: :s3-endpoint-url (use --s3-endpoint-url environment variable)")))
+    (merge (workload opts)
+           {:workload-opts
+            {:restate-config-toml "restate-server-s3-metadata.toml"
+             :additional-env
+             {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))
+              :RESTATE_METADATA_CLIENT__AWS_ENDPOINT_URL (:s3-endpoint-url opts)
+              :RESTATE_METADATA_CLIENT__AWS_REGION "minio"
+              :RESTATE_METADATA_CLIENT__AWS_ALLOW_HTTP "true"
+              :RESTATE_METADATA_CLIENT__AWS_ACCESS_KEY_ID access-key-id
+              :RESTATE_METADATA_CLIENT__AWS_SECRET_ACCESS_KEY secret-access-key}}})))

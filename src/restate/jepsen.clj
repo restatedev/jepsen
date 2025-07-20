@@ -212,13 +212,14 @@
 
 (def workloads
   "A map of workloads."
-  {"set-mds"      set-mds/workload
-   "set-mds-s3"   set-mds/workload-s3
-   "set-mds-gcs"  set-mds/workload-gcs
-   "set-vo"       set-vo/workload
-   "set-vo-s3"    set-vo/workload-s3
-   "register-mds" register-mds/workload
-   "register-vo"  register-vo/workload})
+  {"set-mds"       set-mds/workload
+   "set-mds-s3"    set-mds/workload-s3
+   "set-mds-gcs"   set-mds/workload-gcs
+   "set-mds-minio" set-mds/workload-minio
+   "set-vo"        set-vo/workload
+   "set-vo-s3"     set-vo/workload-s3
+   "register-mds"  register-mds/workload
+   "register-vo"   register-vo/workload})
 
 (def nemeses
   "A map of nemeses."
@@ -338,6 +339,7 @@
    [nil "--snapshot-bucket NAME" "[Optional] Bucket to use for partition snapshots"]
    [nil "--access-key-id ID" "[Optional] Explicit access key for object store access"]
    [nil "--secret-access-key SECRET" "[Optional] Explicit secret key for object store access"]
+   [nil "--s3-endpoint-url URL" "[Optional] Overrides the S3 endpoint for use with alternative stores"]
    ;; By default the cluster is homogeneous - all nodes run restate-server as well as the SDK services.
    ;; This option allows us to separate the SDK services to only run on dedicated nodes.
    [nil "--dedicated-service-nodes N" "Number of dedicated service hosting nodes."
