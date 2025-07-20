@@ -122,6 +122,7 @@
                              (:image-pull-policy opts)))
 
             :--name=restate
+            :--restart "unless-stopped"
             :--network=host ;; we need this to access AWS IMDS credentials on EC2
             ;; :--add-host :host.docker.internal:host-gateway ;; podman doesn't support this
             :--detach
