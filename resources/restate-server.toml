@@ -1,4 +1,4 @@
-roles = ["admin", "metadata-server", "worker", "log-server"]
+roles = ["admin", "metadata-server", "worker", "log-server", "http-ingress",]
 tracing-filter = "info"
 log-filter = "restate=info,slog=info,info"
 log-format = "compact"

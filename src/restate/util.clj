@@ -71,7 +71,7 @@
     :log-interval 5000}))
 
 (defn get-deployments-count []
-  (-> (restate :deployments :list :| :grep "Active" :| :wc :-l)
+  (-> (restate :sql :-q :--jsonl "select count(*) as count from sys_deployment" :| :jq ".count")
       Integer/parseInt))
 
 (defn wait-for-partition-followers [expected-count]

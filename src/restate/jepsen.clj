@@ -216,6 +216,7 @@
    "set-mds-s3"    set-mds/workload-s3
    "set-mds-gcs"   set-mds/workload-gcs
    "set-mds-minio" set-mds/workload-minio
+   "set-mds-ddb"   set-mds/workload-ddb
    "set-vo"        set-vo/workload
    "set-vo-s3"     set-vo/workload-s3
    "register-mds"  register-mds/workload
@@ -335,6 +336,7 @@
    ["-N" "--nemesis NAME" "Nemesis to apply"
     :default "none"
     :validate (nemeses (cli/one-of nemeses))]
+   [nil "--dynamodb-table NAME" "[Optional] DynamoDB table to use for dynamo-db metadata backend"]
    [nil "--metadata-bucket NAME" "[Optional] Bucket to use for object-store metadata backend"]
    [nil "--snapshot-bucket NAME" "[Optional] Bucket to use for partition snapshots"]
    [nil "--access-key-id ID" "[Optional] Explicit access key for object store access"]
