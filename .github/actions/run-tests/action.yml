@@ -2,22 +2,26 @@ name: Run Restate Jepsen tests
 description: "Runs Restate Jepsen test suite. Assumes you have already called the `setup` action."
 inputs:
   restateImageId:
-    description: 'Restate image (ignored if PR set)'
+    description: "Restate image (ignored if PR set)"
     required: false
-    default: 'ghcr.io/restatedev/restate:main'
+    default: "ghcr.io/restatedev/restate:main"
   restatePr:
-    description: 'Use CI Docker image from PR (ignored if commit is set)'
+    description: "Use CI Docker image from PR (ignored if commit is set)"
     required: false
   restateCommit:
-    description: 'Use CI Docker image from Restate commit'
+    description: "Use CI Docker image from Restate commit"
     required: false
   clusterName:
-    description: 'Jepsen workers cluster AWS stack name'
+    description: "Jepsen workers cluster AWS stack name"
     required: true
   testConfig:
-    description: 'Jepsen test run configuration'
+    description: "Jepsen test run configuration"
     required: false
-    default:  '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "50" }'
+    default: '{ "workloads": "set-vo", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "50" }'
+  retainCluster:
+    description: "Retain AWS cluster after Jepsen run"
+    required: false
+    default: "false"
   workDir:
     description: "Test suite checkout location/Jepsen working directory"
     required: false
@@ -58,11 +62,11 @@ runs:
         echo "Checking for node connectivity..."
         CONNECTIVITY_MAX_RETRIES=5
         CONNECTIVITY_RETRY_DELAY=15
-        
+
         while IFS= read -r node || [[ -n "$node" ]]; do
           if [[ -n "$node" && ! "$node" =~ ^[[:space:]]*# ]]; then
             echo -n "  Checking $node... "
-            
+
             CONNECTIVITY_SUCCESS=false
             for attempt in $(seq 1 $CONNECTIVITY_MAX_RETRIES); do
               if timeout 120 bash -c "</dev/tcp/$node/22" 2>/dev/null; then
@@ -78,7 +82,7 @@ runs:
                 fi
               fi
             done
-            
+
             if [ "$CONNECTIVITY_SUCCESS" = false ]; then
               echo "::error::Cannot connect to SSH port on $node after $CONNECTIVITY_MAX_RETRIES attempts"
               exit 1
@@ -119,6 +123,7 @@ runs:
                   --nodes-file aws/nodes.txt \
                   --username admin \
                   --ssh-private-key aws/private-key.pem \
+                  --dynamodb-table "$(jq -r 'keys[0] as $stack_name | .[$stack_name].DynamoDbMetadataTableName' aws/cdk-outputs.json)" \
                   --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
                   --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
                   --workload ${WORKLOAD} --nemesis ${NEMESIS} \
