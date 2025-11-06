@@ -1,4 +1,4 @@
-roles = ["admin", "worker", "log-server"]
+roles = ["admin", "worker", "log-server", "http-ingress"]
 tracing-filter = "info"
 log-filter = "restate=info,slog=info,info"
 log-format = "compact"
@@ -13,8 +13,7 @@ log-trim-check-interval = "5s"
 log-tail-update-interval = "3s"
 
 [metadata-client]
-type = "object-store"
-path = "s3://<metadata-bucket>" # set via environment
+# type / path / table-name are set by the workload via environment overrides
 
 [bifrost]
 default-provider = "replicated"

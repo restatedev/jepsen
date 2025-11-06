@@ -5,19 +5,26 @@ make-services:
   npm clean-install
   npm run bundle
 
-create-aws-cluster stack-name="" allow-source-cidr="0.0.0.0/0" bucket-name="":
+create-aws-cluster stack-name="" allow-source-cidr="0.0.0.0/0" bucket-name="" table-name="":
   #!/usr/bin/env bash
   set -e
   cd aws
   npm clean-install
-  npm run deploy -- --context stack-name={{stack-name}} --context allow-source-cidr={{allow-source-cidr}} --context bucket-name={{bucket-name}}
+  npm run deploy -- \
+    --context stack-name={{stack-name}} \
+    --context allow-source-cidr={{allow-source-cidr}} \
+    --context bucket-name={{bucket-name}} \
+    --context table-name={{table-name}}
   bash get-node-info.sh
 
-destroy-aws-cluster stack-name="" bucket-name="":
+destroy-aws-cluster stack-name="" bucket-name="" table-name="":
   #!/usr/bin/env bash
   set -e
   cd aws
-  npm run destroy -- --context stack-name={{stack-name}} --context bucket-name={{bucket-name}}
+  npm run destroy --\
+    --context stack-name={{stack-name}} \
+    --context bucket-name={{bucket-name}} \
+    --context table-name={{table-name}}
 
 run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restatedev/restate:main":
   #!/usr/bin/env bash
@@ -25,6 +32,7 @@ run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restat
   # NB: we should use unique prefixes for each test run so that we don't have to wipe the bucket contents
   lein run test --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
     --image {{image}} \
+    --dynamodb-table "$(jq -r 'keys[0] as $stack_name | .[$stack_name].DynamoDbMetadataTableName' aws/cdk-outputs.json)" \
     --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
     --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
     --leave-db-running true \

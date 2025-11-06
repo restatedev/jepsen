@@ -94,7 +94,7 @@
       (throw (IllegalArgumentException. "Required parameter missing: :metadata-bucket")))
     (merge (workload opts)
            {:workload-opts
-            {:restate-config-toml "restate-server-s3-metadata.toml"
+            {:restate-config-toml "restate-server-external-metadata.toml"
              :additional-env
              {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))}}})))
 
@@ -112,7 +112,7 @@
       (throw (IllegalArgumentException. "Required parameter missing: :secret-access-key (use --secret-access-key or AWS_SECRET_ACCESS_KEY environment variable)")))
     (merge (workload opts)
            {:workload-opts
-            {:restate-config-toml "restate-server-s3-metadata.toml"
+            {:restate-config-toml "restate-server-external-metadata.toml"
              :additional-env
              {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))
               :RESTATE_METADATA_CLIENT__AWS_ENDPOINT_URL "https://storage.googleapis.com"
@@ -142,7 +142,7 @@
       (throw (IllegalArgumentException. "Required parameter missing: :s3-endpoint-url (use --s3-endpoint-url environment variable)")))
     (merge (workload opts)
            {:workload-opts
-            {:restate-config-toml "restate-server-s3-metadata.toml"
+            {:restate-config-toml "restate-server-external-metadata.toml"
              :additional-env
              {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))
               :RESTATE_METADATA_CLIENT__AWS_ENDPOINT_URL (:s3-endpoint-url opts)
@@ -150,3 +150,16 @@
               :RESTATE_METADATA_CLIENT__AWS_ALLOW_HTTP "true"
               :RESTATE_METADATA_CLIENT__AWS_ACCESS_KEY_ID access-key-id
               :RESTATE_METADATA_CLIENT__AWS_SECRET_ACCESS_KEY secret-access-key}}})))
+
+(defn workload-ddb
+  "Restate Metadata Store-backed Set test workload, using the DynamoDB backend"
+  [opts]
+  (when (nil? (:dynamodb-table opts))
+    (throw (IllegalArgumentException. "Required parameter missing: :dynamodb-table")))
+  (merge (workload opts)
+         {:workload-opts
+          {:restate-config-toml "restate-server-external-metadata.toml"
+           :additional-env
+           {:RESTATE_METADATA_CLIENT__TYPE "dynamo-db"
+            :RESTATE_METADATA_CLIENT__TABLE (:dynamodb-table opts)
+            :RESTATE_METADATA_CLIENT__KEY_PREFIX (str (:unique-id opts) "_")}}}))

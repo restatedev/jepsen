@@ -10,7 +10,7 @@
  */
 
 import * as cdk from "aws-cdk-lib";
-import { aws_ec2 as ec2, aws_iam as iam, aws_s3 as s3 } from "aws-cdk-lib";
+import { aws_ec2 as ec2, aws_iam as iam, aws_s3 as s3, aws_dynamodb as ddb } from "aws-cdk-lib";
 
 const app = new cdk.App();
 
@@ -22,6 +22,7 @@ const instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.
 // if you have existing buckets, pass their names into the stack and the workers will be granted access;
 // if unset, unique buckets will be created as part of deploying the stack
 const bucketName = app.node.tryGetContext("bucket-name");
+const tableName = app.node.tryGetContext("table-name");
 
 // --- no configuration past this point ---
 
@@ -59,7 +60,23 @@ if (bucketName) {
   });
 }
 bucket.grantReadWrite(instanceRole);
-new cdk.CfnOutput(stack, `BucketName`, { value: bucket.bucketName });
+new cdk.CfnOutput(stack, "BucketName", { value: bucket.bucketName });
+
+let table: ddb.ITable;
+if (tableName) {
+  table = ddb.Table.fromTableName(stack, "DynamoDbMetadataTable", tableName);
+} else {
+  table = new ddb.Table(stack, "DynamoDbMetadataTable", {
+    partitionKey: {
+      name: "kind",
+      type: ddb.AttributeType.STRING,
+    },
+    billingMode: ddb.BillingMode.PAY_PER_REQUEST,
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+  });
+}
+table.grantReadWriteData(instanceRole);
+new cdk.CfnOutput(stack, "DynamoDbMetadataTableName", { value: table.tableName });
 
 function addNodeInstance(n: number) {
   const cloudConfig = ec2.UserData.custom([`cloud_final_modules:`, `- [scripts-user, once]`].join("\n"));
