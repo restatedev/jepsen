@@ -57,13 +57,13 @@ jobs:
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-region: us-east-1 # co-locate with WarpBuild worker
-        role-to-assume: 'arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role'
+        role-to-assume: 'arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role'
     - name: Setup Jepsen cluster ${{ env.CLUSTER_NAME }}
       uses: ./.github/actions/setup
       with:
         ref: ${{ inputs.ref }}
         clusterName: ${{ env.CLUSTER_NAME }}
-        bucketName: "restate-jepsen-test-clusters-us-east-1"
+        bucketName: "restate-jepsen-tests-us-east-1"
     - name: Drop AWS credentials
       run: |
         echo "AWS_ACCESS_KEY_ID=" >> $GITHUB_ENV
@@ -81,11 +81,11 @@ jobs:
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-region: us-east-1
-        role-to-assume: "arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role"
+        role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
       if: always()
     - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
       uses: ./.github/actions/teardown
       if: always()
       with:
         clusterName: ${{ env.CLUSTER_NAME }}
-        bucketName: "restate-jepsen-test-clusters-us-east-1"
+        bucketName: "restate-jepsen-tests-us-east-1"
