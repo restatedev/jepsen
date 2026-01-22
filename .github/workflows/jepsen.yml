@@ -29,9 +29,7 @@ on:
       testConfig:
         description: "Test configuration parameters"
         required: false
-        # default: '{"workloads": "set-vo set-mds set-mds-s3 set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "20"}'
-        # TODO: revert before merging
-        default: '{"workloads": "set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "1"}'
+        default: '{"workloads": "set-vo set-mds set-mds-s3 set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "5"}'
       clusterName:
         description: "Jepsen workers cluster AWS stack name"
         required: false
@@ -79,8 +77,14 @@ jobs:
           restateImageId: ${{ inputs.restateImageId }}
           restatePr: ${{ inputs.restatePr }}
           restateCommit: ${{ inputs.restateCommit }}
-          testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}' }}
+          testConfig: ${{ inputs.testConfig || (github.event_name == 'schedule' && '{"workloads":"set-vo set-mds set-mds-s3 set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}') || '{"workloads":"set-vo set-mds set-mds-s3 set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
           retainCluster: ${{ inputs.retainCluster || '"false"' }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
+        if: always()
 
       - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
         uses: ./.github/actions/teardown
