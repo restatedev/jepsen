@@ -82,6 +82,12 @@ jobs:
           testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}' }}
           retainCluster: ${{ inputs.retainCluster || '"false"' }}
 
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
+        if: always()
+
       - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
         uses: ./.github/actions/teardown
         if: ${{ always() && !(inputs.retainCluster || false) }}
