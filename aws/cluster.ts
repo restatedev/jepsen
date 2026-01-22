@@ -68,7 +68,7 @@ if (tableName) {
 } else {
   table = new ddb.Table(stack, "DynamoDbMetadataTable", {
     partitionKey: {
-      name: "kind",
+      name: "pk",
       type: ddb.AttributeType.STRING,
     },
     billingMode: ddb.BillingMode.PAY_PER_REQUEST,
