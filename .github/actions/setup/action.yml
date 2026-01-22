@@ -25,6 +25,9 @@ inputs:
   bucketName:
     description: "Storage bucket for cluster - will be created on-demand if unset"
     required: false
+  tableName:
+    description: "DynamoDB table name for metadata - will be created on-demand if unset"
+    required: false
   workDir:
     description: "Test suite checkout location/Jepsen working directory"
     required: false
@@ -82,4 +85,4 @@ runs:
       working-directory: ./${{ inputs.workDir }}
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
-        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32" "${{ inputs.bucketName }}"
+        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32" "${{ inputs.bucketName }}" "${{ inputs.tableName }}"

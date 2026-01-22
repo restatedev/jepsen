@@ -1,37 +1,44 @@
 name: Run Restate Jepsen tests
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       ref:
         description: "Git ref for test suite"
         required: false
-        default: 'main'
+        default: "main"
       restateCommit:
-        description: 'Git commit id  (uses restatedev/restate Docker artifact)'
+        description: "Git commit id  (uses restatedev/restate Docker artifact)"
         required: false
-        default: ''
+        default: ""
         type: string
       restatePr:
-        description: 'Test against PR Docker artifact (commit takes precedence)'
+        description: "Test against PR Docker artifact (commit takes precedence)"
         required: false
-        default: ''
+        default: ""
         type: string
       restateImageId:
-        description: 'Docker image (PR#/commit take precedence; defaults to ghcr.io/restatedev/restate:main)'
+        description: "Docker image (PR#/commit take precedence; defaults to ghcr.io/restatedev/restate:main)"
         required: false
-        default: 'ghcr.io/restatedev/restate:main'
+        default: "ghcr.io/restatedev/restate:main"
         type: string
       testConfig:
-        description: 'Test configuration parameters'
+        description: "Test configuration parameters"
         required: false
-        default: '{"workloads": "set-vo set-mds set-mds-s3", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "20"}'
+        # default: '{"workloads": "set-vo set-mds set-mds-s3 set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "20"}'
+        # TODO: revert before merging
+        default: '{"workloads": "set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "1"}'
+      clusterName:
+        description: "Jepsen workers cluster AWS stack name"
+        required: false
+        type: string
       retainCluster:
-        description: 'Retain the AWS worker node cluster after test'
+        description: "Retain AWS cluster after Jepsen run"
+        default: false
         required: false
         type: boolean
 
@@ -45,47 +52,40 @@ jobs:
     if: github.event.repository.fork == false
     runs-on: warp-ubuntu-latest-x64-4x
     env:
-      CLUSTER_NAME: restatedev-jepsen-${{ github.event.pull_request.number != null && format('pr{0}', github.event.pull_request.number) || format('run{0}', github.run_id) }}
+      CLUSTER_NAME: ${{ inputs.clusterName || format('restatedev-jepsen-{0}', github.event.pull_request.number != null && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id)) }}
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        repository: restatedev/jepsen
-        sparse-checkout: |
-          .github
+      - uses: actions/checkout@v4
+        with:
+          repository: restatedev/jepsen
+          sparse-checkout: |
+            .github
 
-    - uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-region: us-east-1 # co-locate with WarpBuild worker
-        role-to-assume: 'arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role'
-    - name: Setup Jepsen cluster ${{ env.CLUSTER_NAME }}
-      uses: ./.github/actions/setup
-      with:
-        ref: ${{ inputs.ref }}
-        clusterName: ${{ env.CLUSTER_NAME }}
-        bucketName: "restate-jepsen-tests-us-east-1"
-    - name: Drop AWS credentials
-      run: |
-        echo "AWS_ACCESS_KEY_ID=" >> $GITHUB_ENV
-        echo "AWS_SECRET_ACCESS_KEY=" >> $GITHUB_ENV
-        echo "AWS_SESSION_TOKEN=" >> $GITHUB_ENV
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1 # co-locate with WarpBuild worker
+          role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
+      - name: Setup Jepsen cluster ${{ env.CLUSTER_NAME }}
+        uses: ./.github/actions/setup
+        with:
+          ref: ${{ inputs.ref }}
+          clusterName: ${{ env.CLUSTER_NAME }}
+          bucketName: "restate-jepsen-tests-us-east-1"
+          tableName: "restate-jepsen-tests"
 
-    - name: Run Jepsen tests
-      uses: ./.github/actions/run-tests
-      with:
-        restateImageId: ${{ inputs.restateImageId }}
-        restatePr: ${{ inputs.restatePr }}
-        restateCommit: ${{ inputs.restateCommit }}
-        testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}' }}
+      - name: Run Jepsen tests
+        uses: ./.github/actions/run-tests
+        with:
+          restateImageId: ${{ inputs.restateImageId }}
+          restatePr: ${{ inputs.restatePr }}
+          restateCommit: ${{ inputs.restateCommit }}
+          testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}' }}
+          retainCluster: ${{ inputs.retainCluster || '"false"' }}
 
-    - uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-region: us-east-1
-        role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
-      if: always()
-    - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
-      uses: ./.github/actions/teardown
-      if: always()
-      with:
-        clusterName: ${{ env.CLUSTER_NAME }}
-        bucketName: "restate-jepsen-tests-us-east-1"
+      - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
+        uses: ./.github/actions/teardown
+        if: ${{ always() && !(inputs.retainCluster || false) }}
+        with:
+          clusterName: ${{ env.CLUSTER_NAME }}
+          bucketName: "restate-jepsen-tests-us-east-1"
+          tableName: "restate-jepsen-tests"
