@@ -158,8 +158,9 @@
     (throw (IllegalArgumentException. "Required parameter missing: :dynamodb-table")))
   (merge (workload opts)
          {:workload-opts
-          {:restate-config-toml "restate-server-external-metadata.toml"
+          {:restate-config-toml "restate-server-ddb-metadata.toml"
            :additional-env
            {:RESTATE_METADATA_CLIENT__TYPE "dynamo-db"
             :RESTATE_METADATA_CLIENT__TABLE (:dynamodb-table opts)
-            :RESTATE_METADATA_CLIENT__KEY_PREFIX (str (:unique-id opts) "_")}}}))
+            :RESTATE_METADATA_CLIENT__KEY_PREFIX (str (:unique-id opts) "_")
+            :RESTATE_METADATA_CLIENT__AWS_REGION "us-east-1"}}}))

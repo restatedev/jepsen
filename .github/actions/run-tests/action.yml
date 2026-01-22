@@ -155,20 +155,28 @@ runs:
                       sleep 30
                       continue
                     else
-                      # This is a real test failure (analysis invalid, etc.)
+                      # This is a real test failure (analysis invalid, crash, etc.)
                       echo "Test $((COMPLETED_TESTS + 1)) completed with actual test failure (not infrastructure)"
                       SUCCESS=true
                       GLOBAL_CONSECUTIVE_FAILURES=0
+                      OVERALL_STATUS=1
                     fi
                   else
-                    # Test completed successfully or with analysis results
+                    # Test completed but we need to check if it actually passed
                     SUCCESS=true
                     GLOBAL_CONSECUTIVE_FAILURES=0
+                    # Check for actual success vs failure
+                    if ! grep -q "Everything looks good" store/latest/jepsen.log 2>/dev/null; then
+                      OVERALL_STATUS=1
+                    fi
                   fi
                 else
-                  # Test completed successfully
+                  # Test completed - check if it passed
                   SUCCESS=true
                   GLOBAL_CONSECUTIVE_FAILURES=0
+                  if [ -f store/latest/jepsen.log ] && ! grep -q "Everything looks good" store/latest/jepsen.log; then
+                    OVERALL_STATUS=1
+                  fi
                 fi
               done
 
