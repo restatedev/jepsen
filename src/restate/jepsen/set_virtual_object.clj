@@ -9,7 +9,7 @@
 
 (ns restate.jepsen.set-virtual-object
   "A set service client backed by a Restate Virtual Object.
-  Uses regular HTTP ingress and requires the Set service to be deployed."
+  Uses the versioned /restate/call HTTP ingress API and requires the Set service to be deployed."
   (:require
    [cheshire.core :as json]
    [clojure.tools.logging :refer [info]]
@@ -36,26 +36,26 @@
           :defaults (hu/defaults hu/client)))
 
  (setup! [this _test]
-   (info "Using service URL" (str (:ingress-url this) "/Set/"))
+   (info "Using service URL" (str (:ingress-url this) "/restate/call/Set/"))
    (util/await-fn (fn [] (->> (with-retry
-                                #(hc/get (str (:ingress-url this) "/Set/" key "/get") (:defaults this)))
+                                #(hc/get (str (:ingress-url this) "/restate/call/Set/" key "/get") (:defaults this)))
                               (:status)
                               (= 200))))
    (when (:dummy? (:ssh opts))
      (with-retry
-       #(hc/post (str (:ingress-url this) "/Set/" key "/clear") (:defaults this)))))
+       #(hc/post (str (:ingress-url this) "/restate/call/Set/" key "/clear") (:defaults this)))))
 
  (invoke! [this _test op]
    (try+
     (case (:f op)
       :read (assoc op :type :ok  :value
-                   (->> (hc/post (str (:ingress-url this) "/Set/" key "/get")
+                   (->> (hc/post (str (:ingress-url this) "/restate/call/Set/" key "/get")
                                  (:defaults this))
                         (:body)
                         (json/parse-string))
                    :node (:node this))
 
-      :add (do (hc/post (str (:ingress-url this) "/Set/" key "/add")
+      :add (do (hc/post (str (:ingress-url this) "/restate/call/Set/" key "/add")
                         (merge (:defaults this)
                                {:body (json/generate-string (:value op))}))
                (assoc op :type :ok :node (:node this))))

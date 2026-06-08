@@ -9,7 +9,7 @@
 
 (ns restate.jepsen.register-virtual-object
   "A CAS register service client implemented as a Restate Virtual Object.
-  Uses regular HTTP ingress and requires the Register service to be deployed."
+  Uses the versioned /restate/call HTTP ingress API and requires the Register service to be deployed."
   (:require
    [clojure.tools.logging :refer [info]]
    [jepsen [client :as client]
@@ -37,32 +37,32 @@
 
  (setup! [this _test]
    (info "Using service URL" (:ingress-url this))
-   (util/await-fn (fn [] (->> (hc/get (str (:ingress-url this) "/Register/0/get") (:defaults this))
+   (util/await-fn (fn [] (->> (hc/get (str (:ingress-url this) "/restate/call/Register/0/get") (:defaults this))
                               (:status)
                               (= 200))))
    (when (:dummy? (:ssh opts))
      (doseq [k (range 5)]
-       (hc/post (str (:ingress-url this) "/Register/" k "/clear") (:defaults this)))))
+       (hc/post (str (:ingress-url this) "/restate/call/Register/" k "/clear") (:defaults this)))))
 
  (invoke! [this _test op]
    (let [[k v] (:value op)]
      (try+
       (case (:f op)
         :read (let [value
-                    (->> (hc/get (str (:ingress-url this) "/Register/" k "/get")
+                    (->> (hc/get (str (:ingress-url this) "/restate/call/Register/" k "/get")
                                  (:defaults this))
                          (:body)
                          (parse-long-nil))]
                 (assoc op :type :ok :value (independent/tuple k value) :node (:node this)))
 
-        :write (do (hc/post (str (:ingress-url this) "/Register/" k "/set")
+        :write (do (hc/post (str (:ingress-url this) "/restate/call/Register/" k "/set")
                             (merge (:defaults this)
                                    {:body (json/generate-string v)
                                     :content-type :json}))
                    (assoc op :type :ok :node (:node this)))
 
         :cas (let [[old new] v]
-               (hc/post (str (:ingress-url this) "/Register/" k "/cas")
+               (hc/post (str (:ingress-url this) "/restate/call/Register/" k "/cas")
                         (merge (:defaults this)
                                {:body (json/generate-string {:expected old :newValue new})
                                 :content-type :json}))
