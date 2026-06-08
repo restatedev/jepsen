@@ -80,7 +80,18 @@
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
                                 :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))
-   :heal-time 10})
+   :heal-time 10
+   ;; Raise Restate server logging (via RUST_LOG, which overrides the toml log-filter) to
+   ;; capture partition placement, leadership, replay/catch-up and failure-detector detail
+   ;; while debugging post-heal recovery. Scoped to this workload only.
+   :workload-opts
+   {:additional-env
+    {:RUST_LOG (str "restate=info,slog=info,info"
+                    ",restate_admin::cluster_controller=debug"
+                    ",restate_worker::partition=debug"
+                    ",restate_worker::partition_processor_manager=debug"
+                    ",restate_bifrost::providers::replicated_loglet=debug"
+                    ",restate_node::failure_detector=debug")}}})
 
 (defn workload-s3
   "Restate service-backed Set test workload with snapshots."
