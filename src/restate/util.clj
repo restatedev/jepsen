@@ -116,7 +116,7 @@
               (throw+ {:type :service-deployments-not-ready}))))
 
   (info "Waiting for service to become callable...")
-  (await-url "http://localhost:8080/Set/0/get"))
+  (await-url "http://localhost:8080/restate/call/Set/0/get"))
 
 (defn restate-server-node-count [opts] (- (count (:nodes opts)) (:dedicated-service-nodes opts)))
 
