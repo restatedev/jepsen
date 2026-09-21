@@ -12,6 +12,7 @@
   Note: restate-server must be compiled with the metadata-api feature."
   (:require
    [cheshire.core :as json]
+   [clojure.java.io :as io]
    [clojure.tools.logging :refer [info]]
    [hato.client :as hc]
    [jepsen [client :as client]
@@ -21,6 +22,7 @@
     [util :as u]
     [http :as hu]]
    [restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
+   [restate.jepsen.common :refer [aws-creds]]
    [restate.jepsen.set-ops :refer [r w]]
    [clj-commons.slingshot :refer [try+]]))
 
@@ -105,27 +107,29 @@
              :additional-env
              {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/" (metadata-prefix opts))}}})))
 
+(def gcp-credentials-mount-path "/gcp-credentials.json")
+
 (defn workload-gcs
-  "Restate Metadata Store-backed Set test workload, using the object-store backend with a GCS bucket"
+  "Restate Metadata Store-backed Set test workload, using the object-store backend with a GCS
+  bucket. Restate reads the bucket natively via gs:// and authenticates with a service account
+  key, which is bind-mounted into the container from --gcp-credentials-file and picked up
+  through Google Application Default Credentials."
   [opts]
-  (let [metadata-bucket (:metadata-bucket opts)
-        access-key-id (:access-key-id opts)
-        secret-access-key (:secret-access-key opts)]
-    (when (nil? metadata-bucket)
-      (throw (IllegalArgumentException. "Required parameter missing: :metadata-bucket")))
-    (when (nil? access-key-id)
-      (throw (IllegalArgumentException. "Required parameter missing: :access-key-id (use --access-key-id or AWS_ACCESS_KEY_ID environment variable)")))
-    (when (nil? secret-access-key)
-      (throw (IllegalArgumentException. "Required parameter missing: :secret-access-key (use --secret-access-key or AWS_SECRET_ACCESS_KEY environment variable)")))
+  (let [gcs-bucket (:gcs-bucket opts)
+        credentials-file (:gcp-credentials-file opts)]
+    (when (nil? gcs-bucket)
+      (throw (IllegalArgumentException. "Required parameter missing: :gcs-bucket")))
+    (when (nil? credentials-file)
+      (throw (IllegalArgumentException. "Required parameter missing: :gcp-credentials-file")))
+    (when-not (.isFile (io/file credentials-file))
+      (throw (IllegalArgumentException. (str "GCP credentials file not found: " credentials-file))))
     (merge (workload opts)
            {:workload-opts
             {:restate-config-toml "restate-server-object-store-metadata.toml"
+             :mounted-files {credentials-file gcp-credentials-mount-path}
              :additional-env
-             {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))
-              :RESTATE_METADATA_CLIENT__AWS_ENDPOINT_URL "https://storage.googleapis.com"
-              :RESTATE_METADATA_CLIENT__AWS_REGION "auto"
-              :RESTATE_METADATA_CLIENT__AWS_ACCESS_KEY_ID access-key-id
-              :RESTATE_METADATA_CLIENT__AWS_SECRET_ACCESS_KEY secret-access-key}}})))
+             {:RESTATE_METADATA_CLIENT__PATH (str "gs://" gcs-bucket "/metadata-" (:unique-id opts))
+              :GOOGLE_APPLICATION_CREDENTIALS gcp-credentials-mount-path}}})))
 
 ;; TODO: setup of the Minio server itself is not yet automated, start a server on a node as follows:
 ;;
@@ -137,8 +141,7 @@
   "Restate Metadata Store-backed Set test workload, using the object-store backend with Minio"
   [opts]
   (let [metadata-bucket (:metadata-bucket opts)
-        access-key-id (:access-key-id opts)
-        secret-access-key (:secret-access-key opts)]
+        {:keys [access-key-id secret-access-key]} (aws-creds opts)]
     (when (nil? metadata-bucket)
       (throw (IllegalArgumentException. "Required parameter missing: :metadata-bucket")))
     (when (nil? access-key-id)

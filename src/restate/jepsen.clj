@@ -9,6 +9,7 @@
 
 (ns restate.jepsen
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :refer [info]]
    [jepsen
@@ -82,6 +83,17 @@
 (defn- get-node-name [nodes-list node]
   (str "n" (inc (.indexOf nodes-list node))))
 
+(defn- upload-mounted-files
+  "Uploads each local file in a {local-path container-path} map to the node and returns
+  the Docker --volume arguments that expose them read-only inside the container. Used for
+  credentials that must not appear in the container environment or the test map."
+  [mounted-files]
+  (mapcat (fn [[local-path container-path]]
+            (let [node-path (str restate-root (.getName (io/file local-path)))]
+              (c/upload local-path node-path)
+              ["--volume" (str node-path ":" container-path ":ro")]))
+          mounted-files))
+
 (defn restate
   "A deployment of Restate server."
   [opts]
@@ -114,7 +126,8 @@
                                        (->> (u/restate-server-nodes opts)
                                             (map (fn [n] (str "http://" n ":5122")))
                                             (str/join ","))
-                                       "]")]
+                                       "]")
+               mounted-file-volumes (upload-mounted-files (:mounted-files test))]
            (c/exec
             :docker
             :run
@@ -130,6 +143,7 @@
             :--log-driver=k8s-file :--log-opt=max-size=10m :--log-opt=max-file=5
             :--volume (str restate-config ":/config.toml")
             :--volume "/opt/restate/restate-data:/restate-data"
+            mounted-file-volumes
             (docker-env (merge {:RESTATE_DEFAULT_NUM_PARTITIONS (:num-partitions opts)
                                 :RESTATE_METADATA_CLIENT__ADDRESSES metadata-addresses
                                 :RESTATE_ADVERTISED_ADDRESS (str "http://" node ":5122")
@@ -254,23 +268,6 @@
                             (fn stop [_t _n] [:no-op]))
    "partition-random-node" (nemesis/partition-random-node)})
 
-(defn get-env
-  "Wrapper for System/getenv to enable testing"
-  [var-name]
-  (System/getenv var-name))
-
-(defn aws-creds
-  "Get AWS credentials with precedence: CLI opts > environment variables
-
-   Precedence order:
-   1. CLI arguments: --access-key-id and --secret-access-key
-   2. Environment variables: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
-  [opts]
-  {:access-key-id (or (:access-key-id opts)
-                      (get-env "AWS_ACCESS_KEY_ID"))
-   :secret-access-key (or (:secret-access-key opts)
-                          (get-env "AWS_SECRET_ACCESS_KEY"))})
-
 (defn restate-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
   :concurrency ...), constructs a test map. Special options:
@@ -310,7 +307,6 @@
            {:restate-config-toml "restate-server.toml"}
            (:workload-opts workload)
            (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
-           (aws-creds opts)
            {:pure-generators true
             :name            (str "restate-" (name (:workload opts)))
             :cluster-name    (str "jepsen-" unique-id)
@@ -348,7 +344,9 @@
     :default "none"
     :validate (nemeses (cli/one-of nemeses))]
    [nil "--dynamodb-table NAME" "[Optional] DynamoDB table to use for dynamo-db metadata backend"]
-   [nil "--metadata-bucket NAME" "[Optional] Bucket to use for object-store metadata backend"]
+   [nil "--metadata-bucket NAME" "[Optional] S3 bucket to use for object-store metadata backend"]
+   [nil "--gcs-bucket NAME" "[Optional] GCS bucket to use for object-store metadata backend"]
+   [nil "--gcp-credentials-file PATH" "[Optional] GCP service account key (JSON) granting access to the GCS bucket"]
    [nil "--snapshot-bucket NAME" "[Optional] Bucket to use for partition snapshots"]
    [nil "--access-key-id ID" "[Optional] Explicit access key for object store access"]
    [nil "--secret-access-key SECRET" "[Optional] Explicit secret key for object store access"]

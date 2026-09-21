@@ -26,15 +26,36 @@ destroy-aws-cluster stack-name="" bucket-name="" table-name="":
     --context bucket-name={{bucket-name}} \
     --context table-name={{table-name}}
 
-run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restatedev/restate:main":
+# Creates the GCS bucket and service account for set-mds-gcs; writes the account key to gcp-credentials.json
+create-gcs-bucket project bucket-name="restate-jepsen-tests-us-east4":
   #!/usr/bin/env bash
   set -e
+  cd gcp
+  terraform init -input=false
+  terraform apply -input=false -auto-approve -var project={{project}} -var bucket_name={{bucket-name}}
+  (umask 077 && terraform output -raw service_account_key_json > ../gcp-credentials.json)
+
+destroy-gcs-bucket project bucket-name="restate-jepsen-tests-us-east4":
+  #!/usr/bin/env bash
+  set -e
+  cd gcp
+  terraform destroy -input=false -auto-approve -var project={{project}} -var bucket_name={{bucket-name}}
+  rm -f ../gcp-credentials.json
+
+run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restatedev/restate:main" gcs-bucket="":
+  #!/usr/bin/env bash
+  set -e
+  GCS_ARGS=()
+  if [ -n "{{gcs-bucket}}" ]; then
+    GCS_ARGS=(--gcs-bucket "{{gcs-bucket}}" --gcp-credentials-file gcp-credentials.json)
+  fi
   # NB: we should use unique prefixes for each test run so that we don't have to wipe the bucket contents
   lein run test --nodes-file aws/nodes.txt --username admin --ssh-private-key aws/private-key.pem \
     --image {{image}} \
     --dynamodb-table "$(jq -r 'keys[0] as $stack_name | .[$stack_name].DynamoDbMetadataTableName' aws/cdk-outputs.json)" \
     --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
     --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
+    "${GCS_ARGS[@]}" \
     --leave-db-running true \
     --time-limit 120 --rate 10 --concurrency 5n --test-count 1 \
     --workload {{workload}} --nemesis {{nemesis}}

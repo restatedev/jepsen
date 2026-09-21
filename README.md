@@ -42,6 +42,20 @@ To tear down the cluster after you're done, use:
 just destroy-aws-cluster
 ```
 
+#### GCS bucket for the object-store metadata workload
+
+The `set-mds-gcs` workload points Restate's object-store metadata backend at a GCS bucket using a `gs://` path. The worker nodes run in AWS, so Restate authenticates with a service account key rather than instance credentials. The [gcp](gcp) directory contains a Terraform module that creates the bucket (in `us-east4`, co-located with the `us-east-1` cluster), a service account with object access to that bucket only, and a key for it. The bucket is meant to be long-lived and shared across runs: each run writes under a unique prefix and a lifecycle rule expires leftover objects.
+
+```shell
+just create-gcs-bucket <gcp-project>
+```
+
+This writes the key to `gcp-credentials.json` (gitignored) and leaves the Terraform state, which also contains the key, in `gcp/`. Keep both private. In CI, the same key is provided through the `GCP_CREDENTIALS` repository secret. To pass the bucket to a local test run:
+
+```shell
+just run-test set-mds-gcs partition-random-node ghcr.io/restatedev/restate:main restate-jepsen-tests-us-east4
+```
+
 ### Running tests
 
 To run a specific test against the AWS cluster:
@@ -81,12 +95,12 @@ After the initial run, you can omit the `--image-tarball` argument as the image 
 
 You can select the mode of operation via the `--workload` and `--nemesis` command line arguments.
 
-Two principal workloads are currently available:
+Two principal workloads are currently available, each with variants that exercise a different metadata store backend:
 
-- `set-mds` (requires `restate-server` compiled with `metadata-api` feature)
-- `set-vo` (requires the `Set` virtual object provided in this repository)
+- `set-mds` (requires `restate-server` compiled with `metadata-api` feature) against the embedded replicated metadata store; `set-mds-s3`, `set-mds-gcs` and `set-mds-minio` use the object-store backend with the respective store, and `set-mds-ddb` uses DynamoDB
+- `set-vo` (requires the `Set` virtual object provided in this repository); `set-vo-s3` additionally enables partition snapshots to S3
 
-These both validate linearizability based on the included Jepsen set-append checker. Fault injection strategies currently supported include:
+These all validate linearizability based on the included Jepsen set-append checker. Fault injection strategies currently supported include:
 
 - `none` (default)
 - `kill-random-node` (self-explanatory)

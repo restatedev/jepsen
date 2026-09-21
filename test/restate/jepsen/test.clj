@@ -9,7 +9,7 @@
 
 (ns restate.jepsen.test
   (:require [clojure.test :refer :all]
-            [restate.jepsen :refer [aws-creds get-env]]
+            [restate.jepsen.common :refer [aws-creds get-env]]
             [jepsen.checker :as checker]
             [restate.jepsen.metadata-backend :as metadata-backend]
             [restate.jepsen.set-metadata-store :as set-mds]))
@@ -57,27 +57,38 @@
         (is (= "env-secret-key" (:secret-access-key result)))))))
 
 (deftest workload-gcs-validation-test
-  (testing "workload-gcs throws error when access-key-id is nil"
-    (is (thrown-with-msg? IllegalArgumentException
-                          #"Required parameter missing: :access-key-id"
-                          (set-mds/workload-gcs {:metadata-bucket "test-bucket"
-                                                 :unique-id "test-id"
-                                                 :access-key-id nil
-                                                 :secret-access-key "test-secret"}))))
+  (let [credentials-file (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit)]
+    (spit credentials-file "{}")
 
-  (testing "workload-gcs throws error when secret-access-key is nil"
-    (is (thrown-with-msg? IllegalArgumentException
-                          #"Required parameter missing: :secret-access-key"
-                          (set-mds/workload-gcs {:metadata-bucket "test-bucket"
-                                                 :unique-id "test-id"
-                                                 :access-key-id "test-key"
-                                                 :secret-access-key nil}))))
+    (testing "workload-gcs requires a bucket"
+      (is (thrown-with-msg? IllegalArgumentException
+                            #"Required parameter missing: :gcs-bucket"
+                            (set-mds/workload-gcs {:unique-id "test-id"
+                                                   :gcp-credentials-file (.getPath credentials-file)}))))
 
-  (testing "workload-gcs succeeds when all required parameters are provided"
-    (is (some? (set-mds/workload-gcs {:metadata-bucket "test-bucket"
-                                      :unique-id "test-id"
-                                      :access-key-id "test-key"
-                                      :secret-access-key "test-secret"})))))
+    (testing "workload-gcs requires a credentials file"
+      (is (thrown-with-msg? IllegalArgumentException
+                            #"Required parameter missing: :gcp-credentials-file"
+                            (set-mds/workload-gcs {:gcs-bucket "test-bucket"
+                                                   :unique-id "test-id"}))))
+
+    (testing "workload-gcs rejects a missing credentials file"
+      (is (thrown-with-msg? IllegalArgumentException
+                            #"GCP credentials file not found"
+                            (set-mds/workload-gcs {:gcs-bucket "test-bucket"
+                                                   :unique-id "test-id"
+                                                   :gcp-credentials-file "/nonexistent/key.json"}))))
+
+    (testing "workload-gcs mounts the credentials file and points Restate at the bucket"
+      (let [workload-opts (:workload-opts (set-mds/workload-gcs {:gcs-bucket "test-bucket"
+                                                                 :unique-id "test-id"
+                                                                 :gcp-credentials-file (.getPath credentials-file)}))]
+        (is (= {(.getPath credentials-file) set-mds/gcp-credentials-mount-path}
+               (:mounted-files workload-opts)))
+        (is (= "gs://test-bucket/metadata-test-id"
+               (get-in workload-opts [:additional-env :RESTATE_METADATA_CLIENT__PATH])))
+        (is (= set-mds/gcp-credentials-mount-path
+               (get-in workload-opts [:additional-env :GOOGLE_APPLICATION_CREDENTIALS])))))))
 
 (defn- metadata-client-type
   "The metadata client type a workload configures, via its environment or its config file."
@@ -96,7 +107,10 @@
               :secret-access-key "test-secret"
               :s3-endpoint-url "http://minio:9000"}]
     (is (= "object-store" (metadata-client-type (set-mds/workload-s3 opts))))
-    (is (= "object-store" (metadata-client-type (set-mds/workload-gcs opts))))
+    (is (= "object-store" (metadata-client-type (set-mds/workload-gcs
+                                                  (assoc opts
+                                                         :gcs-bucket "test-bucket"
+                                                         :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit)))))))
     (is (= "object-store" (metadata-client-type (set-mds/workload-minio opts))))
     (is (= "dynamo-db" (metadata-client-type (set-mds/workload-ddb opts))))))
 

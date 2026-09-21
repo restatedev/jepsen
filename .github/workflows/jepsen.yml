@@ -27,7 +27,7 @@ on:
       testConfig:
         description: "Test configuration parameters"
         required: false
-        default: '{"workloads": "set-vo set-mds set-mds-s3 set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "20"}'
+        default: '{"workloads": "set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "20"}'
       clusterName:
         description: "Jepsen workers cluster AWS stack name"
         required: false
@@ -75,7 +75,9 @@ jobs:
           restateImageId: ${{ inputs.restateImageId }}
           restatePr: ${{ inputs.restatePr }}
           restateCommit: ${{ inputs.restateCommit }}
-          testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3 set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
+          gcsBucket: "restate-jepsen-tests-us-east4"
+          gcpCredentials: ${{ secrets.GCP_CREDENTIALS }}
+          testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
           retainCluster: ${{ inputs.retainCluster || '"false"' }}
 
       - uses: aws-actions/configure-aws-credentials@v4

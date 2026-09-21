@@ -22,3 +22,10 @@ cdk.context.json
 cdk.out
 cdk-outputs.json
 *.pem
+
+# GCP
+gcp/.terraform/
+gcp/.terraform.lock.hcl
+gcp/terraform.tfstate*
+gcp/*.tfvars
+gcp-credentials.json
