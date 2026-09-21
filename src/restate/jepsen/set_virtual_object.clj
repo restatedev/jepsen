@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -24,7 +24,7 @@
    [restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
    [restate.jepsen.common :refer [with-retry]]
    [restate.jepsen.set-ops :refer [r w]]
-   [slingshot.slingshot :refer [try+]]))
+   [clj-commons.slingshot :refer [try+]]))
 
 (defrecord
  SetServiceClient [key opts] client/Client

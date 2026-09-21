@@ -1,7 +1,7 @@
 (ns jepsen-patched.util
   (:require
    [clojure.tools.logging :refer [info]]
-   [slingshot.slingshot :refer [throw+ try+]]))
+   [clj-commons.slingshot :refer [throw+ try+]]))
 
 (defn ^Long linear-time-nanos
   "A linear time source in nanoseconds."

@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -8,7 +8,7 @@
 ; https://github.com/restatedev/jepsen/blob/main/LICENSE
 
 (ns restate.jepsen.common
-  (:require [slingshot.slingshot :refer [try+]]))
+  (:require [clj-commons.slingshot :refer [try+]]))
 
 (defn parse-long-nil
   "Parses a string to a Long. Passes through `nil`."

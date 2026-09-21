@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -11,10 +11,6 @@
   (:require [clojure.test :refer :all]
             [restate.jepsen :refer [aws-creds get-env]]
             [restate.jepsen.set-metadata-store :as set-mds]))
-
-(deftest some-test
-  (testing "tautological"
-    (is (= 1 1))))
 
 (deftest aws-creds-test
   (testing "CLI opts take precedence over environment variables"

@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -15,7 +15,7 @@
     [control :as c]
     [util :as util]]
    [jepsen-patched.util :refer [await-fn]]
-   [slingshot.slingshot :refer [throw+]]))
+   [clj-commons.slingshot :refer [throw+]]))
 
 (defn restate [cmd & args]
   (c/exec :docker :exec :restate :restate cmd args))
@@ -81,24 +81,6 @@
    {:status-fn (fn [_] (info "Waiting for" expected-count "follower partition processors:\n"
                              (restatectl :partitions :list :|| :true)))
     :log-interval 5000}))
-
-(defn await-tcp-port
-  ;; copy of the built-in Jepsen one with ability to set custom host
-  "Blocks until a local TCP port is bound. Options:
-
-  :retry-interval   How long between retries, in ms. Default 1s.
-  :log-interval     How long between logging that we're still waiting, in ms.
-                    Default `retry-interval.
-  :timeout          How long until giving up and throwing :type :timeout, in
-                    ms. Default 60 seconds."
-  ([host port]
-   (await-tcp-port host port {}))
-  ([host port opts]
-   (util/await-fn
-    (fn check-port []
-      (c/exec :nc :-z host port)
-      nil)
-    (merge {:log-message (str "Waiting for port " port " ...")} opts))))
 
 (defn await-url
   ([url]

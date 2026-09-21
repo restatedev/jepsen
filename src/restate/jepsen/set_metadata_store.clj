@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -22,10 +22,10 @@
     [http :as hu]]
    [restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
    [restate.jepsen.set-ops :refer [r w]]
-   [slingshot.slingshot :refer [try+]]))
+   [clj-commons.slingshot :refer [try+]]))
 
 (defrecord
- SetMetadatsStoreClient [key opts] client/Client
+ SetMetadataStoreClient [key opts] client/Client
 
  (open! [this test node]
    (assoc this
@@ -80,7 +80,7 @@
 (defn workload
   "Restate Metadata Store-backed Set test workload, using the replicated store backend"
   [opts]
-  {:client    (SetMetadatsStoreClient. "jepsen-set" opts)
+  {:client    (SetMetadataStoreClient. "jepsen-set" opts)
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
                                 :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))
