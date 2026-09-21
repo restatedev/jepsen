@@ -1,5 +1,5 @@
-name: Restate Jepsen tests
-description: "Run Restate Jepsen tests"
+name: Tear down Restate Jepsen test cluster
+description: "Destroys the Jepsen worker cluster created by the `setup` action."
 inputs:
   clusterName:
     description: 'Jepsen workers cluster AWS stack name'

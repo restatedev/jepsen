@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -119,7 +119,7 @@
             :run
             (str "--pull=" (if (:image-tarball test)
                              "never"
-                             (:image-pull-policy opts)))
+                             (:image-pull opts)))
 
             :--name=restate
             :--restart "unless-stopped"
@@ -155,7 +155,7 @@
 
          (when (= node (first (:nodes test)))
            (info "Performing once-off setup")
-           (when (> (:dedicated-service-nodes opts) 0) (u/await-tcp-port (last (:nodes opts)) 9080))
+           (when (> (:dedicated-service-nodes opts) 0) (cu/await-tcp-port (last (:nodes opts)) 9080 {}))
            (u/restate :deployments :register (app-service-url opts) :--yes)
            (info "Restate cluster status:\n" (u/restatectl :status :--extra)))
 
@@ -244,7 +244,7 @@
    "nuke-partition-state"  (nemesis/node-start-stopper
                             rand-nth
                             (fn start [test node]
-                              (info "Starting nemesis on node:" node (str "n" (inc (.indexOf (:nodes test) node))) <)
+                              (info "Starting nemesis on node:" node (str "n" (inc (.indexOf (:nodes test) node))))
                               (c/su (c/exec :docker :kill :-s :KILL "restate")
                                     (c/exec :mv (str "/opt/restate/restate-data/" "n" (inc (.indexOf (:nodes test) node)) "/db/")
                                             (str "/opt/restate/restate-data/" "n" (inc (.indexOf (:nodes test) node)) "/db." (inst-ms (java.util.Date.))))

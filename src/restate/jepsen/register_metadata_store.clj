@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -20,7 +20,7 @@
    [knossos.model :as model]
    [hato.client :as hc]
    [cheshire.core :as json]
-   [slingshot.slingshot :refer [try+]]
+   [clj-commons.slingshot :refer [try+]]
    [restate
     [util :as u]
     [http :as hu]]
@@ -28,7 +28,7 @@
    [restate.jepsen.register-ops :refer [r w cas]]))
 
 (defrecord
- RegisterMetadatsStoreClient [opts] client/Client
+ RegisterMetadataStoreClient [opts] client/Client
 
  (open! [this test node] (assoc this
                                 :node (str "n" (inc (.indexOf (:nodes test) node)))
@@ -100,7 +100,7 @@
 (defn workload
   "Linearizable reads, writes, and compare-and-set operations on independent keys."
   [opts]
-  {:client    (RegisterMetadatsStoreClient. opts)
+  {:client    (RegisterMetadataStoreClient. opts)
    :checker   (independent/checker
                (checker/linearizable {:model     (model/cas-register)
                                       :algorithm :linear}))

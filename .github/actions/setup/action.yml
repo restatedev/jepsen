@@ -1,24 +1,10 @@
 name: Set up Restate Jepsen test suite and cluster
-description: "Provisiongs Jepsen worker nodes and sets up the test suite execution environment."
+description: "Provisions Jepsen worker nodes and sets up the test suite execution environment."
 inputs:
   ref:
     description: "Git ref to use for test suite"
     required: false
     default: ""
-  restateImageId:
-    description: "Restate image (ignored if PR set)"
-    required: false
-    default: "ghcr.io/restatedev/restate:main"
-  restatePr:
-    description: "Use CI Docker image from PR (ignored if commit is set)"
-    required: false
-  restateCommit:
-    description: "Use CI Docker image from Restate commit"
-    required: false
-  roleArn:
-    description: "AWS role to assume"
-    required: true
-    default: "arn:aws:iam::339713187748:role/github-restatedev-jepsen-actions-role"
   clusterName:
     description: "Jepsen workers cluster AWS stack name"
     required: true

@@ -1,4 +1,4 @@
-; Copyright (c) 2023-2025 - Restate Software, Inc., Restate GmbH
+; Copyright (c) 2023-2026 - Restate Software, Inc., Restate GmbH
 ;
 ; This file is part of the Restate Jepsen test suite,
 ; which is released under the MIT license.
@@ -8,8 +8,7 @@
 ; https://github.com/restatedev/jepsen/blob/main/LICENSE
 
 (ns restate.jepsen.checker.tail-ok
-  "A set service client backed by a Restate Virtual Object.
-  Uses regular HTTP ingress and requires the Set service to be deployed."
+  "Liveness checker verifying that every node ends the test with successful operations after the final nemesis heal."
   (:require
    [jepsen.checker :as checker]))
 
