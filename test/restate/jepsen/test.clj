@@ -10,6 +10,8 @@
 (ns restate.jepsen.test
   (:require [clojure.test :refer :all]
             [restate.jepsen :refer [aws-creds get-env]]
+            [jepsen.checker :as checker]
+            [restate.jepsen.metadata-backend :as metadata-backend]
             [restate.jepsen.set-metadata-store :as set-mds]))
 
 (deftest aws-creds-test
@@ -76,3 +78,46 @@
                                       :unique-id "test-id"
                                       :access-key-id "test-key"
                                       :secret-access-key "test-secret"})))))
+
+(defn- metadata-client-type
+  "The metadata client type a workload configures, via its environment or its config file."
+  [workload]
+  (let [{:keys [additional-env restate-config-toml]} (:workload-opts workload)]
+    (or (:RESTATE_METADATA_CLIENT__TYPE additional-env)
+        (second (re-find #"(?m)^type = \"([^\"]+)\"" (slurp (str "resources/" restate-config-toml)))))))
+
+(deftest external-metadata-workloads-select-their-backend-test
+  ;; Without an explicit type, Restate falls back to the replicated metadata store and ignores
+  ;; the object-store path, so these workloads would silently test the wrong backend.
+  (let [opts {:unique-id "test-id"
+              :metadata-bucket "test-bucket"
+              :dynamodb-table "test-table"
+              :access-key-id "test-key"
+              :secret-access-key "test-secret"
+              :s3-endpoint-url "http://minio:9000"}]
+    (is (= "object-store" (metadata-client-type (set-mds/workload-s3 opts))))
+    (is (= "object-store" (metadata-client-type (set-mds/workload-gcs opts))))
+    (is (= "object-store" (metadata-client-type (set-mds/workload-minio opts))))
+    (is (= "dynamo-db" (metadata-client-type (set-mds/workload-ddb opts))))))
+
+(deftest workloads-declare-their-metadata-backend-test
+  (let [opts {:unique-id "test-id" :metadata-bucket "test-bucket" :dynamodb-table "test-table"}]
+    (is (= "s3://test-bucket/metadata-test-id/jepsen-set"
+           (metadata-backend/location (:metadata-backend (set-mds/workload-s3 opts)))))
+    (is (= "dynamodb://test-table/test-id_jepsen-set"
+           (metadata-backend/location (:metadata-backend (set-mds/workload-ddb opts)))))
+    (is (nil? (:metadata-backend (set-mds/workload opts))))))
+
+(deftest metadata-backend-checker-test
+  (let [backend {:store :s3 :bucket "b" :key "k"}
+        check (fn [history] (checker/check (metadata-backend/checker backend) {} history {}))
+        verify-op (fn [value] {:process :nemesis :type :info :f :verify-metadata-backend :value value})
+        client-ops [{:process 0 :type :invoke :f :read} {:process 0 :type :ok :f :read :value #{}}]]
+    (testing "passes when the lookup found the key"
+      (is (= {:valid? true :location "s3://b/k"}
+             (check (concat client-ops [(verify-op nil) (verify-op {:found? true})])))))
+    (testing "fails when the lookup did not find the key"
+      (is (= {:valid? false :location "s3://b/k" :error "404"}
+             (check (concat client-ops [(verify-op nil) (verify-op {:found? false :error "404"})])))))
+    (testing "fails when no lookup happened"
+      (is (false? (:valid? (check client-ops)))))))

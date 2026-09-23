@@ -77,10 +77,14 @@
 
  (close! [_ _test]))
 
+(def set-key "jepsen-set")
+
+(defn- metadata-prefix [opts] (str "metadata-" (:unique-id opts)))
+
 (defn workload
   "Restate Metadata Store-backed Set test workload, using the replicated store backend"
   [opts]
-  {:client    (SetMetadataStoreClient. "jepsen-set" opts)
+  {:client    (SetMetadataStoreClient. set-key opts)
    :checker   (checker/compose {:set (checker/set-full {:linearizable? true})
                                 :heal (all-nodes-ok-after-final-heal)})
    :generator (gen/reserve 5 (repeat (r)) (w))
@@ -93,10 +97,13 @@
     (when (nil? metadata-bucket)
       (throw (IllegalArgumentException. "Required parameter missing: :metadata-bucket")))
     (merge (workload opts)
-           {:workload-opts
-            {:restate-config-toml "restate-server-external-metadata.toml"
+           {:metadata-backend {:store :s3
+                               :bucket metadata-bucket
+                               :key (str (metadata-prefix opts) "/" set-key)}
+            :workload-opts
+            {:restate-config-toml "restate-server-object-store-metadata.toml"
              :additional-env
-             {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))}}})))
+             {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/" (metadata-prefix opts))}}})))
 
 (defn workload-gcs
   "Restate Metadata Store-backed Set test workload, using the object-store backend with a GCS bucket"
@@ -112,7 +119,7 @@
       (throw (IllegalArgumentException. "Required parameter missing: :secret-access-key (use --secret-access-key or AWS_SECRET_ACCESS_KEY environment variable)")))
     (merge (workload opts)
            {:workload-opts
-            {:restate-config-toml "restate-server-external-metadata.toml"
+            {:restate-config-toml "restate-server-object-store-metadata.toml"
              :additional-env
              {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))
               :RESTATE_METADATA_CLIENT__AWS_ENDPOINT_URL "https://storage.googleapis.com"
@@ -142,7 +149,7 @@
       (throw (IllegalArgumentException. "Required parameter missing: :s3-endpoint-url (use --s3-endpoint-url environment variable)")))
     (merge (workload opts)
            {:workload-opts
-            {:restate-config-toml "restate-server-external-metadata.toml"
+            {:restate-config-toml "restate-server-object-store-metadata.toml"
              :additional-env
              {:RESTATE_METADATA_CLIENT__PATH (str "s3://" metadata-bucket "/metadata-" (:unique-id opts))
               :RESTATE_METADATA_CLIENT__AWS_ENDPOINT_URL (:s3-endpoint-url opts)
@@ -157,7 +164,10 @@
   (when (nil? (:dynamodb-table opts))
     (throw (IllegalArgumentException. "Required parameter missing: :dynamodb-table")))
   (merge (workload opts)
-         {:workload-opts
+         {:metadata-backend {:store :dynamodb
+                             :table (:dynamodb-table opts)
+                             :key (str (:unique-id opts) "_" set-key)}
+          :workload-opts
           {:restate-config-toml "restate-server-ddb-metadata.toml"
            :additional-env
            {:RESTATE_METADATA_CLIENT__TYPE "dynamo-db"
