@@ -44,33 +44,10 @@ just destroy-aws-cluster
 
 #### GCS bucket for the object-store metadata workload
 
-The `set-mds-gcs` workload points Restate's object-store metadata backend at a GCS bucket using a `gs://` path. The worker nodes run in AWS, so Restate authenticates with a service account key rather than instance credentials. The [gcp](gcp) directory contains a Terraform module that creates, in the `restate-runtime-ci` project:
-
-- the bucket, in `us-east4` to be co-located with the `us-east-1` cluster; each run writes under a unique prefix and a lifecycle rule expires leftover objects
-- a service account, bound on that bucket only to a custom role that can get, create and overwrite objects and nothing else
+The `set-mds-gcs` workload needs a GCS bucket and a service account key. They live in the `restate-runtime-ci` GCP project and are managed by the Terraform module in [gcp](gcp), whose README covers setup and key rotation. To run the workload locally, mint a key into `gcp-credentials.json` and pass the bucket name:
 
 ```shell
-just create-gcs-bucket
-```
-
-The Terraform state lives in the `restate-runtime-ci-tfstate` bucket, under the `jepsen` prefix. That bucket cannot hold its own state, so it was created once by hand:
-
-```shell
-gcloud storage buckets create gs://restate-runtime-ci-tfstate --project restate-runtime-ci \
-  --location us-east4 --uniform-bucket-level-access --public-access-prevention
-gcloud storage buckets update gs://restate-runtime-ci-tfstate --versioning
-```
-
-The key is not managed by Terraform, so the state holds no secrets. For CI, mint a key straight into the `GCP_CREDENTIALS` repository secret; for local runs, mint one into `gcp-credentials.json` (gitignored):
-
-```shell
-just gcp-key-to-github
 just gcp-key-file
-```
-
-The test runner uploads the key to each worker node as a root-only file and bind-mounts it read-only into the Restate container. Only its local path appears in the Jepsen test map and logs. To rotate, mint a new key, then delete superseded ones listed by `just gcp-keys`. To pass the bucket to a local test run:
-
-```shell
 just run-test set-mds-gcs partition-random-node ghcr.io/restatedev/restate:main restate-jepsen-tests-us-east4
 ```
 

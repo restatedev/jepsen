@@ -26,6 +26,7 @@ destroy-aws-cluster stack-name="" bucket-name="" table-name="":
     --context bucket-name={{bucket-name}} \
     --context table-name={{table-name}}
 
+# Must match the defaults in gcp/variables.tf
 gcp-project := "restate-runtime-ci"
 gcp-service-account := "restate-jepsen-tests@" + gcp-project + ".iam.gserviceaccount.com"
 

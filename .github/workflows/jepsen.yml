@@ -75,6 +75,7 @@ jobs:
           restateImageId: ${{ inputs.restateImageId }}
           restatePr: ${{ inputs.restatePr }}
           restateCommit: ${{ inputs.restateCommit }}
+          # Bucket and key come from gcp/; see gcp/README.md
           gcsBucket: "restate-jepsen-tests-us-east4"
           gcpCredentials: ${{ secrets.GCP_CREDENTIALS }}
           testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
