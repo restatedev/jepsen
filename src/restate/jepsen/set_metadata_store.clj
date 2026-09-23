@@ -124,11 +124,15 @@
     (when-not (.isFile (io/file credentials-file))
       (throw (IllegalArgumentException. (str "GCP credentials file not found: " credentials-file))))
     (merge (workload opts)
-           {:workload-opts
+           {:metadata-backend {:store :gcs
+                               :bucket gcs-bucket
+                               :key (str (metadata-prefix opts) "/" set-key)
+                               :credentials-file credentials-file}
+            :workload-opts
             {:restate-config-toml "restate-server-object-store-metadata.toml"
              :mounted-files {credentials-file gcp-credentials-mount-path}
              :additional-env
-             {:RESTATE_METADATA_CLIENT__PATH (str "gs://" gcs-bucket "/metadata-" (:unique-id opts))
+             {:RESTATE_METADATA_CLIENT__PATH (str "gs://" gcs-bucket "/" (metadata-prefix opts))
               :GOOGLE_APPLICATION_CREDENTIALS gcp-credentials-mount-path}}})))
 
 ;; TODO: setup of the Minio server itself is not yet automated, start a server on a node as follows:

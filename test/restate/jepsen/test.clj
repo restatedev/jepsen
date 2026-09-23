@@ -120,6 +120,12 @@
            (metadata-backend/location (:metadata-backend (set-mds/workload-s3 opts)))))
     (is (= "dynamodb://test-table/test-id_jepsen-set"
            (metadata-backend/location (:metadata-backend (set-mds/workload-ddb opts)))))
+    (is (= "gs://test-bucket/metadata-test-id/jepsen-set"
+           (metadata-backend/location
+            (:metadata-backend (set-mds/workload-gcs
+                                (assoc opts
+                                       :gcs-bucket "test-bucket"
+                                       :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit))))))))
     (is (nil? (:metadata-backend (set-mds/workload opts))))))
 
 (deftest metadata-backend-checker-test

@@ -9,7 +9,6 @@
 
 (ns restate.jepsen
   (:require
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :refer [info]]
    [jepsen
@@ -30,9 +29,8 @@
    [restate.jepsen.set-virtual-object :as set-vo]
    [restate.util :as u]))
 
-(def restate-root "/opt/restate/")
-(def restate-config (str restate-root "config.toml"))
-(def restate-logfile (str restate-root "restate.log"))
+(def restate-config (str u/restate-root "config.toml"))
+(def restate-logfile (str u/restate-root "restate.log"))
 (def services-root "/opt/services/")
 (def services-args (str services-root "services.js"))
 (def services-pidfile (str services-root "services.pid"))
@@ -89,7 +87,7 @@
   credentials that must not appear in the container environment or the test map."
   [mounted-files]
   (mapcat (fn [[local-path container-path]]
-            (let [node-path (str restate-root (.getName (io/file local-path)))]
+            (let [node-path (u/mounted-file-node-path local-path)]
               (c/upload local-path node-path)
               (c/exec :chown "root:root" node-path)
               (c/exec :chmod "600" node-path)
@@ -106,9 +104,9 @@
         (info node "Setting up Restate on" (c/exec :hostname))
 
         (c/su
-         (c/exec :mkdir :-p (str restate-root "restate-data"))
-         (c/exec :chmod 777 restate-root)
-         (c/exec :ls :-l restate-root)
+         (c/exec :mkdir :-p (str u/restate-root "restate-data"))
+         (c/exec :chmod 777 u/restate-root)
+         (c/exec :ls :-l u/restate-root)
 
          (when (:image-tarball test)
            (info node "Uploading Docker image" (:image-tarball test) "to" node)
@@ -183,7 +181,7 @@
       (when (not (:dummy? (:ssh test)))
         (info node "Tearing down Restate on" (c/exec :hostname))
         (c/su
-         (c/exec :rm :-rf restate-root)
+         (c/exec :rm :-rf u/restate-root)
          (c/exec :docker :rm :-f "restate" :|| :true))))
 
     db/LogFiles
