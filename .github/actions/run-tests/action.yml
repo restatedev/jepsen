@@ -71,6 +71,7 @@ runs:
         # runner uploads to the worker nodes; the key never enters the Jepsen test map or logs.
         GCS_ARGS=()
         if [ -n "${GCP_CREDENTIALS}" ]; then
+          trap 'rm -f gcp-credentials.json' EXIT
           umask 077
           printf '%s' "${GCP_CREDENTIALS}" > gcp-credentials.json
           umask 022
@@ -137,6 +138,7 @@ runs:
                   echo "Retry attempt $RETRY_COUNT of $((MAX_RETRIES - 1)) for test $((COMPLETED_TESTS + 1))"
                 fi
 
+                LATEST_BEFORE=$(readlink store/latest 2>/dev/null)
                 lein run test \
                   --nodes-file aws/nodes.txt \
                   --username admin \
@@ -154,7 +156,17 @@ runs:
                   --leave-db-running ${{ inputs.retainCluster || 'false' }} \
                   | grep -Fv ' jepsen.util '
 
-                TEST_EXIT_CODE=$?
+                TEST_EXIT_CODE=${PIPESTATUS[0]}
+
+                # A test that fails before Jepsen creates its result directory (e.g. invalid
+                # options) must not be judged by the previous run's store/latest/jepsen.log.
+                if [ "$(readlink store/latest 2>/dev/null)" = "${LATEST_BEFORE}" ]; then
+                  echo "::error::Test $((COMPLETED_TESTS + 1)) for ${WORKLOAD}/${NEMESIS} exited with status ${TEST_EXIT_CODE} without producing results"
+                  SUCCESS=true
+                  GLOBAL_CONSECUTIVE_FAILURES=0
+                  OVERALL_STATUS=1
+                  continue
+                fi
 
                 # Check if this was an infrastructure failure we should retry
                 if [ $TEST_EXIT_CODE -ne 0 ] && [ -f store/latest/jepsen.log ]; then
@@ -247,9 +259,9 @@ runs:
                 echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_TIMESTAMP} | ${INDIVIDUAL_STATUS} |" >> ${RESULTS_TABLE}
               done
             else
-              # Fallback to latest if no workload directory found
-              RUN_ID=$(readlink store/latest 2>/dev/null || echo "unknown")
-              echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_ID} | ${TEST_STATUS} |" >> ${RESULTS_TABLE}
+              # No run of this workload produced results
+              echo "| ${WORKLOAD} | ${NEMESIS} | none | ❌ |" >> ${RESULTS_TABLE}
+              OVERALL_STATUS=1
             fi
 
             # Create detailed results summary (using latest run)
