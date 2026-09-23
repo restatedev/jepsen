@@ -53,6 +53,14 @@ The `set-mds-gcs` workload points Restate's object-store metadata backend at a G
 just create-gcs-bucket
 ```
 
+The Terraform state lives in the `restate-runtime-ci-tfstate` bucket, under the `jepsen` prefix. That bucket cannot hold its own state, so it was created once by hand:
+
+```shell
+gcloud storage buckets create gs://restate-runtime-ci-tfstate --project restate-runtime-ci \
+  --location us-east4 --uniform-bucket-level-access --public-access-prevention
+gcloud storage buckets update gs://restate-runtime-ci-tfstate --versioning
+```
+
 The key is not managed by Terraform, so the state holds no secrets. For CI, mint a key straight into the `GCP_CREDENTIALS` repository secret; for local runs, mint one into `gcp-credentials.json` (gitignored):
 
 ```shell

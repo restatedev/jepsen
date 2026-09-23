@@ -20,6 +20,12 @@
 terraform {
   required_version = ">= 1.5"
 
+  // Created out-of-band (see README) because it cannot hold its own state.
+  backend "gcs" {
+    bucket = "restate-runtime-ci-tfstate"
+    prefix = "jepsen"
+  }
+
   required_providers {
     google = {
       source  = "hashicorp/google"
