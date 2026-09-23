@@ -42,13 +42,18 @@ permissions:
   id-token: write
   contents: read
 
+# A new push to a PR supersedes its in-progress run; cancelled runs still tear down their cluster.
+concurrency:
+  group: jepsen-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   jepsen-tests:
     # id tokens are not available on forks
     if: github.event.repository.fork == false
     runs-on: warp-ubuntu-latest-x64-4x
     env:
-      CLUSTER_NAME: ${{ inputs.clusterName || format('restatedev-jepsen-{0}', github.event.pull_request.number != null && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id)) }}
+      CLUSTER_NAME: ${{ inputs.clusterName || format('restatedev-jepsen-{0}', github.event.pull_request.number != null && format('pr-{0}-{1}', github.event.pull_request.number, github.run_id) || format('run-{0}', github.run_id)) }}
 
     steps:
       - uses: actions/checkout@v4
