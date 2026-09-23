@@ -272,7 +272,8 @@
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
   :concurrency ...), constructs a test map. Special options:
 
-      :rate         Approximate number of requests per second, per thread
+      :rate         Approximate number of requests per second, across all clients;
+                    a workload's :max-rate caps it
       :ops-per-key  Maximum number of operations allowed on any given key.
       :workload     Type of workload.
       :nemesis      Nemesis to apply."
@@ -281,18 +282,21 @@
                    (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss")
                    (java.util.Date.))
         workload ((get workloads (:workload opts)) (merge opts {:unique-id unique-id}))
+        rate (min (:rate opts) (:max-rate workload ##Inf))
+        _ (when (< rate (:rate opts))
+            (info "Workload" (:workload opts) "caps --rate" (:rate opts) "at" rate))
         backend (:metadata-backend workload)
         base-nemesis (get nemeses (:nemesis opts))
         workload-generator (if (or
                                 (= (:nemesis opts) "none")
                                 (nil? (:heal-time workload)))
                              (->> (:generator workload)
-                                  (gen/stagger (/ (:rate opts)))
+                                  (gen/stagger (/ rate))
                                   (gen/time-limit (:time-limit opts))
                                   (gen/clients))
                              (gen/phases
                               (->> (:generator workload)
-                                   (gen/stagger (/ (:rate opts)))
+                                   (gen/stagger (/ rate))
                                    (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
                                                         (gen/sleep 5) {:type :info, :f :stop}]))
                                    (gen/time-limit (:time-limit opts)))
@@ -300,7 +304,7 @@
                               (gen/once (gen/nemesis [{:type :info, :f :stop}]))
                               (gen/log "Running post-heal workload")
                               (->> (:generator workload)
-                                   (gen/stagger (/ (:rate opts)))
+                                   (gen/stagger (/ rate))
                                    (gen/time-limit (:heal-time workload)))))]
     (merge tests/noop-test
            opts
@@ -308,6 +312,7 @@
            (:workload-opts workload)
            (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
            {:pure-generators true
+            :rate            rate
             :name            (str "restate-" (name (:workload opts)))
             :cluster-name    (str "jepsen-" unique-id)
             :db              (cluster-setup (restate opts) (app-server opts))
@@ -362,7 +367,7 @@
     :default  1
     :parse-fn read-string
     :validate [#(and (number? %) (pos? %)) "Must be a positive number"]]
-   ["-r" "--rate HZ" "Approximate number of requests per second, per thread."
+   ["-r" "--rate HZ" "Approximate number of requests per second, across all clients."
     :default  10
     :parse-fn read-string
     :validate [#(and (number? %) (pos? %)) "Must be a positive number"]]

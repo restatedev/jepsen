@@ -109,6 +109,11 @@
 
 (def gcp-credentials-mount-path "/gcp-credentials.json")
 
+;; GCS sustains roughly one write per second to a single object and throttles the rest with
+;; HTTP 429. Every add rewrites the same object, so a higher rate only adds throttling,
+;; retry backoff and client timeouts, which fail the post-heal liveness check.
+(def gcs-max-rate 2)
+
 (defn workload-gcs
   "Restate Metadata Store-backed Set test workload, using the object-store backend with a GCS
   bucket. Restate reads the bucket natively via gs:// and authenticates with a service account
@@ -124,7 +129,8 @@
     (when-not (.isFile (io/file credentials-file))
       (throw (IllegalArgumentException. (str "GCP credentials file not found: " credentials-file))))
     (merge (workload opts)
-           {:metadata-backend {:store :gcs
+           {:max-rate gcs-max-rate
+            :metadata-backend {:store :gcs
                                :bucket gcs-bucket
                                :key (str (metadata-prefix opts) "/" set-key)
                                :credentials-file credentials-file}

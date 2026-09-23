@@ -9,6 +9,7 @@
 
 (ns restate.jepsen.test
   (:require [clojure.test :refer :all]
+            [restate.jepsen :refer [restate-test]]
             [restate.jepsen.common :refer [aws-creds get-env]]
             [jepsen.checker :as checker]
             [restate.jepsen.metadata-backend :as metadata-backend]
@@ -141,3 +142,18 @@
              (check (concat client-ops [(verify-op nil) (verify-op {:found? false :error "404"})])))))
     (testing "fails when no lookup happened"
       (is (false? (:valid? (check client-ops)))))))
+
+(deftest workload-rate-cap-test
+  (let [opts {:nodes ["n1" "n2" "n3"] :concurrency 3 :time-limit 10 :dedicated-service-nodes 0
+              :num-partitions 1 :nemesis "none" :ssh {:dummy? true}}]
+    (testing "a workload's max-rate caps --rate"
+      (is (= set-mds/gcs-max-rate
+             (:rate (restate-test
+                     (assoc opts :workload "set-mds-gcs" :rate 100 :gcs-bucket "b"
+                            :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit))))))))
+    (testing "workloads without a cap keep --rate"
+      (is (= 100 (:rate (restate-test (assoc opts :workload "set-mds" :rate 100))))))
+    (testing "a lower --rate stays below the cap"
+      (is (= 1 (:rate (restate-test
+                       (assoc opts :workload "set-mds-gcs" :rate 1 :gcs-bucket "b"
+                              :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit))))))))))
