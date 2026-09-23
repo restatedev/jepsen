@@ -76,3 +76,24 @@
                                       :unique-id "test-id"
                                       :access-key-id "test-key"
                                       :secret-access-key "test-secret"})))))
+
+(defn- metadata-client-type
+  "The metadata client type a workload configures, via its environment or its config file."
+  [workload]
+  (let [{:keys [additional-env restate-config-toml]} (:workload-opts workload)]
+    (or (:RESTATE_METADATA_CLIENT__TYPE additional-env)
+        (second (re-find #"(?m)^type = \"([^\"]+)\"" (slurp (str "resources/" restate-config-toml)))))))
+
+(deftest external-metadata-workloads-select-their-backend-test
+  ;; Without an explicit type, Restate falls back to the replicated metadata store and ignores
+  ;; the object-store path, so these workloads would silently test the wrong backend.
+  (let [opts {:unique-id "test-id"
+              :metadata-bucket "test-bucket"
+              :dynamodb-table "test-table"
+              :access-key-id "test-key"
+              :secret-access-key "test-secret"
+              :s3-endpoint-url "http://minio:9000"}]
+    (is (= "object-store" (metadata-client-type (set-mds/workload-s3 opts))))
+    (is (= "object-store" (metadata-client-type (set-mds/workload-gcs opts))))
+    (is (= "object-store" (metadata-client-type (set-mds/workload-minio opts))))
+    (is (= "dynamo-db" (metadata-client-type (set-mds/workload-ddb opts))))))

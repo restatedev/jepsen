@@ -1,4 +1,4 @@
-roles = ["admin", "metadata-server", "worker", "log-server", "http-ingress"]
+roles = ["admin", "worker", "log-server", "http-ingress"]
 tracing-filter = "info"
 log-filter = "restate=info,slog=info,info"
 log-format = "compact"
@@ -13,7 +13,9 @@ log-trim-check-interval = "5s"
 log-tail-update-interval = "3s"
 
 [metadata-client]
-# type / path / table are set by the workload via environment overrides
+# Without an explicit type, Restate silently falls back to the replicated metadata store.
+type = "object-store"
+# path and store-specific options are set by the workload via environment overrides
 
 [bifrost]
 default-provider = "replicated"
