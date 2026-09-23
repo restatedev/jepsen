@@ -109,10 +109,12 @@
 
 (def gcp-credentials-mount-path "/gcp-credentials.json")
 
-;; GCS sustains roughly one write per second to a single object and throttles the rest with
-;; HTTP 429. Every add rewrites the same object, so a higher rate only adds throttling,
-;; retry backoff and client timeouts, which fail the post-heal liveness check.
-(def gcs-max-rate 2)
+;; GCS allows about one write per second to a single object and throttles the rest with
+;; HTTP 429. Every add rewrites the same object, so beyond this rate extra requests only add
+;; throttling, retry backoff and client timeouts, which fail the post-heal liveness check.
+;; At 4 every test passed while committing about 1.5 writes per second; at 100 about half
+;; of them failed that check.
+(def gcs-max-rate 4)
 
 (defn workload-gcs
   "Restate Metadata Store-backed Set test workload, using the object-store backend with a GCS
