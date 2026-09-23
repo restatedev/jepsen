@@ -1,6 +1,7 @@
 variable "project" {
   description = "GCP project that hosts the bucket and service account"
   type        = string
+  default     = "restate-runtime-ci"
 }
 
 variable "region" {

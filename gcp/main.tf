@@ -9,10 +9,13 @@
  * https://github.com/restatedev/jepsen/blob/main/LICENSE
  */
 
-// A GCS bucket for the object-store metadata workloads, plus a service account whose
-// key the Jepsen worker nodes (which run in AWS) use to reach it. Each test run writes
-// under a unique prefix, so the bucket is shared across runs and objects are expired by
-// a lifecycle rule rather than cleaned up per run.
+// A GCS bucket for the object-store metadata workloads, plus a service account that the
+// Jepsen worker nodes (which run in AWS) authenticate as. Each test run writes under a
+// unique prefix, so the bucket is shared across runs and objects are expired by a
+// lifecycle rule rather than cleaned up per run.
+//
+// The service account key is deliberately not managed here, so that the Terraform state
+// holds no secrets; mint it with `just gcp-key-to-github` or `just gcp-key-file`.
 
 terraform {
   required_version = ">= 1.5"
@@ -28,6 +31,17 @@ terraform {
 provider "google" {
   project = var.project
   region  = var.region
+
+  // User Application Default Credentials need a quota project for these APIs.
+  billing_project       = var.project
+  user_project_override = true
+}
+
+resource "google_project_service" "apis" {
+  for_each = toset(["cloudresourcemanager.googleapis.com", "iam.googleapis.com", "storage.googleapis.com"])
+
+  service            = each.value
+  disable_on_destroy = false
 }
 
 resource "google_storage_bucket" "metadata" {
@@ -51,23 +65,36 @@ resource "google_storage_bucket" "metadata" {
   labels = {
     purpose = "jepsen-tests"
   }
+
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_service_account" "jepsen" {
   account_id   = var.service_account_id
   display_name = "Restate Jepsen test workers"
   description  = "Used by Jepsen worker nodes running in AWS to access the metadata bucket"
+
+  depends_on = [google_project_service.apis]
 }
 
-resource "google_storage_bucket_iam_member" "jepsen_object_admin" {
+// The object-store metadata backend only reads objects and writes them with generation
+// preconditions. GCS requires storage.objects.delete to overwrite an existing object, so
+// that is included; listing, object ACLs and bucket access are not.
+resource "google_project_iam_custom_role" "metadata_object_store" {
+  role_id     = "jepsenMetadataObjectStore"
+  title       = "Jepsen metadata object store"
+  description = "Read, create and overwrite objects; bound on the Jepsen metadata bucket only"
+  permissions = [
+    "storage.objects.create",
+    "storage.objects.delete",
+    "storage.objects.get",
+  ]
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "jepsen" {
   bucket = google_storage_bucket.metadata.name
-  role   = "roles/storage.objectAdmin"
+  role   = google_project_iam_custom_role.metadata_object_store.id
   member = google_service_account.jepsen.member
-}
-
-// The key ends up in the Terraform state; keep that state private. The JSON is what the
-// Jepsen runner passes via --gcp-credentials-file (locally) or the GCP_CREDENTIALS
-// GitHub Actions secret (CI).
-resource "google_service_account_key" "jepsen" {
-  service_account_id = google_service_account.jepsen.name
 }

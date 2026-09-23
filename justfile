@@ -26,21 +26,42 @@ destroy-aws-cluster stack-name="" bucket-name="" table-name="":
     --context bucket-name={{bucket-name}} \
     --context table-name={{table-name}}
 
-# Creates the GCS bucket and service account for set-mds-gcs; writes the account key to gcp-credentials.json
-create-gcs-bucket project bucket-name="restate-jepsen-tests-us-east4":
-  #!/usr/bin/env bash
-  set -e
-  cd gcp
-  terraform init -input=false
-  terraform apply -input=false -auto-approve -var project={{project}} -var bucket_name={{bucket-name}}
-  (umask 077 && terraform output -raw service_account_key_json > ../gcp-credentials.json)
+gcp-project := "restate-runtime-ci"
+gcp-service-account := "restate-jepsen-tests@" + gcp-project + ".iam.gserviceaccount.com"
 
-destroy-gcs-bucket project bucket-name="restate-jepsen-tests-us-east4":
+# Creates the GCS bucket, service account and least-privilege role for set-mds-gcs
+create-gcs-bucket:
+  cd gcp && terraform init -input=false && terraform apply -input=false -auto-approve
+
+destroy-gcs-bucket:
+  cd gcp && terraform destroy -input=false -auto-approve
+
+# Mints a service account key directly into restatedev/jepsen's GCP_CREDENTIALS secret, without writing it to disk
+gcp-key-to-github:
   #!/usr/bin/env bash
-  set -e
-  cd gcp
-  terraform destroy -input=false -auto-approve -var project={{project}} -var bucket_name={{bucket-name}}
-  rm -f ../gcp-credentials.json
+  set -euo pipefail
+  key=$(just _mint-gcp-key)
+  base64 --decode <<< "${key}" | gh secret set GCP_CREDENTIALS --repo restatedev/jepsen
+
+# Mints a service account key for local test runs into gcp-credentials.json (gitignored)
+gcp-key-file:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  key=$(just _mint-gcp-key)
+  (umask 077 && base64 --decode <<< "${key}" > gcp-credentials.json)
+
+# Lists the service account's keys; delete superseded ones with `gcloud iam service-accounts keys delete`
+gcp-keys:
+  gcloud iam service-accounts keys list --managed-by=user --iam-account={{gcp-service-account}} --project={{gcp-project}}
+
+_mint-gcp-key:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  curl -sSf -X POST \
+    -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
+    -H "x-goog-user-project: {{gcp-project}}" \
+    "https://iam.googleapis.com/v1/projects/{{gcp-project}}/serviceAccounts/{{gcp-service-account}}/keys" \
+    | jq -er .privateKeyData
 
 run-test workload="set-vo" nemesis="partition-random-node" image="ghcr.io/restatedev/restate:main" gcs-bucket="":
   #!/usr/bin/env bash

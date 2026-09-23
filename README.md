@@ -44,13 +44,23 @@ just destroy-aws-cluster
 
 #### GCS bucket for the object-store metadata workload
 
-The `set-mds-gcs` workload points Restate's object-store metadata backend at a GCS bucket using a `gs://` path. The worker nodes run in AWS, so Restate authenticates with a service account key rather than instance credentials. The [gcp](gcp) directory contains a Terraform module that creates the bucket (in `us-east4`, co-located with the `us-east-1` cluster), a service account with object access to that bucket only, and a key for it. The bucket is meant to be long-lived and shared across runs: each run writes under a unique prefix and a lifecycle rule expires leftover objects.
+The `set-mds-gcs` workload points Restate's object-store metadata backend at a GCS bucket using a `gs://` path. The worker nodes run in AWS, so Restate authenticates with a service account key rather than instance credentials. The [gcp](gcp) directory contains a Terraform module that creates, in the `restate-runtime-ci` project:
+
+- the bucket, in `us-east4` to be co-located with the `us-east-1` cluster; each run writes under a unique prefix and a lifecycle rule expires leftover objects
+- a service account, bound on that bucket only to a custom role that can get, create and overwrite objects and nothing else
 
 ```shell
-just create-gcs-bucket <gcp-project>
+just create-gcs-bucket
 ```
 
-This writes the key to `gcp-credentials.json` (gitignored) and leaves the Terraform state, which also contains the key, in `gcp/`. Keep both private. In CI, the same key is provided through the `GCP_CREDENTIALS` repository secret. To pass the bucket to a local test run:
+The key is not managed by Terraform, so the state holds no secrets. For CI, mint a key straight into the `GCP_CREDENTIALS` repository secret; for local runs, mint one into `gcp-credentials.json` (gitignored):
+
+```shell
+just gcp-key-to-github
+just gcp-key-file
+```
+
+The test runner uploads the key to each worker node as a root-only file and bind-mounts it read-only into the Restate container. Only its local path appears in the Jepsen test map and logs. To rotate, mint a new key, then delete superseded ones listed by `just gcp-keys`. To pass the bucket to a local test run:
 
 ```shell
 just run-test set-mds-gcs partition-random-node ghcr.io/restatedev/restate:main restate-jepsen-tests-us-east4

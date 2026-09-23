@@ -91,6 +91,8 @@
   (mapcat (fn [[local-path container-path]]
             (let [node-path (str restate-root (.getName (io/file local-path)))]
               (c/upload local-path node-path)
+              (c/exec :chown "root:root" node-path)
+              (c/exec :chmod "600" node-path)
               ["--volume" (str node-path ":" container-path ":ro")]))
           mounted-files))
 
