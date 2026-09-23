@@ -22,6 +22,7 @@
    [jepsen.checker.timeline :as timeline]
    [jepsen.control.util :as cu]
    [jepsen.os.debian :as debian]
+   [restate.jepsen.metadata-backend :as metadata-backend]
    [restate.jepsen.register-metadata-store :as register-mds]
    [restate.jepsen.register-virtual-object :as register-vo]
    [restate.jepsen.set-metadata-store :as set-mds]
@@ -282,7 +283,28 @@
   (let [unique-id (.format
                    (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss")
                    (java.util.Date.))
-        workload ((get workloads (:workload opts)) (merge opts {:unique-id unique-id}))]
+        workload ((get workloads (:workload opts)) (merge opts {:unique-id unique-id}))
+        backend (:metadata-backend workload)
+        base-nemesis (get nemeses (:nemesis opts))
+        workload-generator (if (or
+                                (= (:nemesis opts) "none")
+                                (nil? (:heal-time workload)))
+                             (->> (:generator workload)
+                                  (gen/stagger (/ (:rate opts)))
+                                  (gen/time-limit (:time-limit opts))
+                                  (gen/clients))
+                             (gen/phases
+                              (->> (:generator workload)
+                                   (gen/stagger (/ (:rate opts)))
+                                   (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
+                                                        (gen/sleep 5) {:type :info, :f :stop}]))
+                                   (gen/time-limit (:time-limit opts)))
+                              (gen/log "Healing cluster")
+                              (gen/once (gen/nemesis [{:type :info, :f :stop}]))
+                              (gen/log "Running post-heal workload")
+                              (->> (:generator workload)
+                                   (gen/stagger (/ (:rate opts)))
+                                   (gen/time-limit (:heal-time workload)))))]
     (merge tests/noop-test
            opts
            {:restate-config-toml "restate-server.toml"}
@@ -295,32 +317,21 @@
             :db              (cluster-setup (restate opts) (app-server opts))
             :barrier         (java.util.concurrent.CyclicBarrier. (u/restate-server-node-count opts))
             :client          (:client workload)
-            :nemesis         (get nemeses (:nemesis opts))
-            :generator       (if (or
-                                  (= (:nemesis opts) "none")
-                                  (nil? (:heal-time workload)))
-                               (->> (:generator workload)
-                                    (gen/stagger (/ (:rate opts)))
-                                    (gen/time-limit (:time-limit opts))
-                                    (gen/clients))
-                               (gen/phases
-                                (->> (:generator workload)
-                                     (gen/stagger (/ (:rate opts)))
-                                     (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
-                                                          (gen/sleep 5) {:type :info, :f :stop}]))
-                                     (gen/time-limit (:time-limit opts)))
-                                (gen/log "Healing cluster")
-                                (gen/once (gen/nemesis [{:type :info, :f :stop}]))
-                                (gen/log "Running post-heal workload")
-                                (->> (:generator workload)
-                                     (gen/stagger (/ (:rate opts)))
-                                     (gen/time-limit (:heal-time workload)))))
+            :nemesis         (if backend
+                               (metadata-backend/verifying-nemesis base-nemesis backend)
+                               base-nemesis)
+            :generator       (if backend
+                               (gen/phases workload-generator
+                                           (gen/log "Verifying the metadata backend")
+                                           metadata-backend/final-phase)
+                               workload-generator)
             :checker         (checker/compose
-                              {:perf       (checker/perf)
-                               :stats      (checker/stats)
-                               :exceptions (checker/unhandled-exceptions)
-                               :timeline   (timeline/html)
-                               :workload   (:checker workload)})
+                              (cond-> {:perf       (checker/perf)
+                                       :stats      (checker/stats)
+                                       :exceptions (checker/unhandled-exceptions)
+                                       :timeline   (timeline/html)
+                                       :workload   (:checker workload)}
+                                backend (assoc :metadata-backend (metadata-backend/checker backend))))
             :logging {:console false}})))
 
 (def cli-opts
