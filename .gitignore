@@ -29,3 +29,4 @@ gcp/.terraform.lock.hcl
 gcp/terraform.tfstate*
 gcp/*.tfvars
 gcp-credentials.json
+gcp-credentials.*

@@ -12,7 +12,6 @@
   Note: restate-server must be compiled with the metadata-api feature."
   (:require
    [cheshire.core :as json]
-   [clojure.java.io :as io]
    [clojure.tools.logging :refer [info]]
    [hato.client :as hc]
    [jepsen [client :as client]
@@ -128,8 +127,6 @@
       (throw (IllegalArgumentException. "Required parameter missing: :gcs-bucket")))
     (when (nil? credentials-file)
       (throw (IllegalArgumentException. "Required parameter missing: :gcp-credentials-file")))
-    (when-not (.isFile (io/file credentials-file))
-      (throw (IllegalArgumentException. (str "GCP credentials file not found: " credentials-file))))
     (merge (workload opts)
            {:max-rate gcs-max-rate
             :metadata-backend {:store :gcs

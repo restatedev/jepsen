@@ -20,10 +20,14 @@
 
 (def restate-root "/opt/restate/")
 
+(def mounted-files-root
+  "Root-only directory on each node holding a workload's :mounted-files."
+  (str restate-root "mounted-files/"))
+
 (defn mounted-file-node-path
   "Where a file from a workload's :mounted-files is uploaded to on each node."
   [local-path]
-  (str restate-root (.getName (io/file local-path))))
+  (str mounted-files-root (.getName (io/file local-path))))
 
 (defn restate [cmd & args]
   (c/exec :docker :exec :restate :restate cmd args))

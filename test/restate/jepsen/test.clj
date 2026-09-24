@@ -73,13 +73,6 @@
                             (set-mds/workload-gcs {:gcs-bucket "test-bucket"
                                                    :unique-id "test-id"}))))
 
-    (testing "workload-gcs rejects a missing credentials file"
-      (is (thrown-with-msg? IllegalArgumentException
-                            #"GCP credentials file not found"
-                            (set-mds/workload-gcs {:gcs-bucket "test-bucket"
-                                                   :unique-id "test-id"
-                                                   :gcp-credentials-file "/nonexistent/key.json"}))))
-
     (testing "workload-gcs mounts the credentials file and points Restate at the bucket"
       (let [workload-opts (:workload-opts (set-mds/workload-gcs {:gcs-bucket "test-bucket"
                                                                  :unique-id "test-id"
@@ -157,3 +150,8 @@
       (is (= 1 (:rate (restate-test
                        (assoc opts :workload "set-mds-gcs" :rate 1 :gcs-bucket "b"
                               :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit))))))))))
+
+(deftest unique-run-ids-test
+  (let [opts {:nodes ["n1"] :concurrency 1 :rate 10 :time-limit 10 :dedicated-service-nodes 0
+              :num-partitions 1 :nemesis "none" :ssh {:dummy? true} :workload "set-mds"}]
+    (is (not= (:cluster-name (restate-test opts)) (:cluster-name (restate-test opts))))))

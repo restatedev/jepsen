@@ -49,7 +49,10 @@ gcp-key-file:
   #!/usr/bin/env bash
   set -euo pipefail
   key=$(just _mint-gcp-key)
-  (umask 077 && base64 --decode <<< "${key}" > gcp-credentials.json)
+  file=$(mktemp gcp-credentials.XXXXXX)
+  trap 'rm -f "${file}"' EXIT
+  base64 --decode <<< "${key}" > "${file}"
+  mv -f "${file}" gcp-credentials.json
 
 # Lists the service account's keys; delete superseded ones with `gcloud iam service-accounts keys delete`
 gcp-keys:
@@ -58,8 +61,9 @@ gcp-keys:
 _mint-gcp-key:
   #!/usr/bin/env bash
   set -euo pipefail
+  token=$(gcloud auth application-default print-access-token)
   curl -sSf -X POST \
-    -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
+    -H @<(printf 'Authorization: Bearer %s' "${token}") \
     -H "x-goog-user-project: {{gcp-project}}" \
     "https://iam.googleapis.com/v1/projects/{{gcp-project}}/serviceAccounts/{{gcp-service-account}}/keys" \
     | jq -er .privateKeyData

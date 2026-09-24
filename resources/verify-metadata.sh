@@ -28,6 +28,8 @@ b64url() {
   openssl base64 -A | tr '+/' '-_' | tr -d '='
 }
 
+# Tokens and signed assertions are passed to curl through process substitution with the
+# printf builtin, so they never appear in a process's arguments.
 gcs_access_token() {
   local key_file=$1 now header claims signature
   now=$(date +%s)
@@ -37,9 +39,10 @@ gcs_access_token() {
       aud: "https://oauth2.googleapis.com/token", iat: $now, exp: ($now + 300)}' | b64url)
   signature=$(printf '%s.%s' "${header}" "${claims}" |
     openssl dgst -sha256 -sign <(jq -r .private_key "${key_file}") | b64url)
-  curl -sSf https://oauth2.googleapis.com/token \
-    -d grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer \
-    -d assertion="${header}.${claims}.${signature}" | jq -er .access_token
+  curl -sSf https://oauth2.googleapis.com/token --data-binary @<(
+    printf 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=%s' \
+      "${header}.${claims}.${signature}"
+  ) | jq -er .access_token
 }
 
 store=$1
@@ -54,7 +57,8 @@ case "${store}" in
       { echo "item ${2} not found in table ${1}" >&2; exit 1; }
     ;;
   gcs)
-    curl -sSf -o /dev/null -H "Authorization: Bearer $(gcs_access_token "$3")" \
+    token=$(gcs_access_token "$3")
+    curl -sSf -o /dev/null -H @<(printf 'Authorization: Bearer %s' "${token}") \
       "https://storage.googleapis.com/storage/v1/b/$1/o/$(jq -rn --arg name "$2" '$name | @uri')"
     ;;
   *)

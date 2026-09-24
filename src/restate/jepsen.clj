@@ -9,6 +9,7 @@
 
 (ns restate.jepsen
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :refer [info]]
    [jepsen
@@ -27,7 +28,10 @@
    [restate.jepsen.register-virtual-object :as register-vo]
    [restate.jepsen.set-metadata-store :as set-mds]
    [restate.jepsen.set-virtual-object :as set-vo]
-   [restate.util :as u]))
+   [restate.util :as u])
+  (:import
+   (java.nio.file Files)
+   (java.nio.file.attribute FileAttribute PosixFilePermissions)))
 
 (def restate-config (str u/restate-root "config.toml"))
 (def restate-logfile (str u/restate-root "restate.log"))
@@ -81,18 +85,33 @@
 (defn- get-node-name [nodes-list node]
   (str "n" (inc (.indexOf nodes-list node))))
 
+(defn- upload-private!
+  "Uploads a local file so that only root can read it on the node. Jepsen's scp preserves
+  the source file's mode, so the upload goes through a local copy that only we can read."
+  [local-path node-path]
+  (let [owner-only (PosixFilePermissions/asFileAttribute (PosixFilePermissions/fromString "rw-------"))
+        copy (Files/createTempFile "mounted-file" "" (into-array FileAttribute [owner-only]))]
+    (try
+      (io/copy (io/file local-path) (.toFile copy))
+      (c/upload (str copy) node-path)
+      (c/exec :chown "root:root" node-path)
+      (c/exec :chmod "600" node-path)
+      (finally
+        (Files/deleteIfExists copy)))))
+
 (defn- upload-mounted-files
   "Uploads each local file in a {local-path container-path} map to the node and returns
   the Docker --volume arguments that expose them read-only inside the container. Used for
   credentials that must not appear in the container environment or the test map."
   [mounted-files]
-  (mapcat (fn [[local-path container-path]]
-            (let [node-path (u/mounted-file-node-path local-path)]
-              (c/upload local-path node-path)
-              (c/exec :chown "root:root" node-path)
-              (c/exec :chmod "600" node-path)
-              ["--volume" (str node-path ":" container-path ":ro")]))
-          mounted-files))
+  (when (seq mounted-files)
+    (c/exec :install :-d :-m "700" :-o "root" :-g "root" u/mounted-files-root))
+  (into []
+        (mapcat (fn [[local-path container-path]]
+                  (let [node-path (u/mounted-file-node-path local-path)]
+                    (upload-private! local-path node-path)
+                    ["--volume" (str node-path ":" container-path ":ro")])))
+        mounted-files))
 
 (defn restate
   "A deployment of Restate server."
@@ -278,9 +297,10 @@
       :workload     Type of workload.
       :nemesis      Nemesis to apply."
   [opts]
-  (let [unique-id (.format
-                   (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss")
-                   (java.util.Date.))
+  (let [;; Runs share external buckets and tables, so the id must not collide across runs
+        ;; that start in the same second.
+        unique-id (str (.format (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss") (java.util.Date.))
+                       "-" (format "%06x" (rand-int 0x1000000)))
         workload ((get workloads (:workload opts)) (merge opts {:unique-id unique-id}))
         rate (min (:rate opts) (:max-rate workload ##Inf))
         _ (when (< rate (:rate opts))
