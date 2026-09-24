@@ -12,6 +12,7 @@
             [restate.jepsen :refer [restate-test]]
             [restate.jepsen.common :refer [aws-creds get-env]]
             [jepsen.checker :as checker]
+            [jepsen.client :as client]
             [restate.jepsen.metadata-backend :as metadata-backend]
             [restate.jepsen.set-metadata-store :as set-mds]))
 
@@ -155,3 +156,14 @@
   (let [opts {:nodes ["n1"] :concurrency 1 :rate 10 :time-limit 10 :dedicated-service-nodes 0
               :num-partitions 1 :nemesis "none" :ssh {:dummy? true} :workload "set-mds"}]
     (is (not= (:cluster-name (restate-test opts)) (:cluster-name (restate-test opts))))))
+
+(deftest set-metadata-store-setup-writes-once-test
+  (let [nodes ["a.example" "b.example" "c.example"]
+        writes (atom [])
+        client (:client (set-mds/workload {:unique-id "test-id"
+                                           :nodes nodes
+                                           :dedicated-service-nodes 0}))]
+    (with-redefs [hato.client/put (fn [url _] (swap! writes conj url))]
+      (doall (pmap #(client/setup! (client/open! client {:nodes nodes} %) {:nodes nodes}) nodes)))
+    (is (= 1 (count @writes)))
+    (is (clojure.string/includes? (first @writes) "a.example"))))

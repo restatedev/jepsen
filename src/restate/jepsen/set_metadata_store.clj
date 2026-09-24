@@ -37,10 +37,13 @@
 
  (setup! [this _test]
    (info "Using service URL" (:endpoint this))
-   (hc/put (str (:endpoint this) key)
-           (merge (:defaults this)
-                  {:body (json/generate-string #{})
-                   :headers {"if-match" "*" "etag" "1"}})))
+   ;; Jepsen sets up every node's client at once, before any operation runs. One client
+   ;; creates the set: simultaneous writes of one object exceed GCS's per-object write limit.
+   (when (= "n1" (:node this))
+     (hc/put (str (:endpoint this) key)
+             (merge (:defaults this)
+                    {:body (json/generate-string #{})
+                     :headers {"if-match" "*" "etag" "1"}}))))
 
  (invoke! [this _test op]
    (try+
