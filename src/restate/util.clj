@@ -74,13 +74,19 @@
 (defn get-partition-processor-follower-count []
   (get-partition-processors-count "Follower.*Active"))
 
+(defn- partitions-ready-timeout
+  "Clusters with many partitions take longer to start all partition processors."
+  [expected-count]
+  (max 60000 (* 1000 expected-count)))
+
 (defn wait-for-partition-leaders [expected-count]
   (await-fn
    (fn [] (or (= (get-partition-processor-leader-count) expected-count)
               (throw+ {:type :restate-pp-not-ready})))
    {:status-fn (fn [_] (info "Waiting for" expected-count "leader partition processors:\n"
                              (restatectl :partitions :list :|| :true)))
-    :log-interval 5000}))
+    :log-interval 5000
+    :timeout (partitions-ready-timeout expected-count)}))
 
 (defn get-deployments-count []
   (-> (restate :sql :-q :--jsonl "select count(*) as count from sys_deployment" :| :jq ".count")
@@ -92,7 +98,8 @@
               (throw+ {:type :restate-pp-not-ready})))
    {:status-fn (fn [_] (info "Waiting for" expected-count "follower partition processors:\n"
                              (restatectl :partitions :list :|| :true)))
-    :log-interval 5000}))
+    :log-interval 5000
+    :timeout (partitions-ready-timeout expected-count)}))
 
 (defn await-url
   ([url]

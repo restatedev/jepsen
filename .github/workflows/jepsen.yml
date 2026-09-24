@@ -32,6 +32,10 @@ on:
         description: "Jepsen workers cluster AWS stack name"
         required: false
         type: string
+      instanceType:
+        description: "EC2 instance type for worker nodes (default t3.small)"
+        required: false
+        type: string
       retainCluster:
         description: "Retain AWS cluster after Jepsen run"
         default: false
@@ -73,6 +77,7 @@ jobs:
           clusterName: ${{ env.CLUSTER_NAME }}
           bucketName: "restate-jepsen-tests-us-east-1"
           tableName: "restate-jepsen-tests"
+          instanceType: ${{ inputs.instanceType }}
 
       - name: Run Jepsen tests
         uses: ./.github/actions/run-tests

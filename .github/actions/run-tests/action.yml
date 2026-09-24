@@ -152,6 +152,7 @@ runs:
                   --time-limit ${{ fromJSON(inputs.testConfig).duration || 30 }} \
                   --rate ${{ fromJSON(inputs.testConfig).rate || 10 }} \
                   --concurrency ${{ fromJSON(inputs.testConfig).concurrency || '5n' }} \
+                  --num-partitions ${{ fromJSON(inputs.testConfig).numPartitions || 1 }} \
                   --test-count 1 \
                   --leave-db-running ${{ inputs.retainCluster || 'false' }} \
                   | grep -Fv ' jepsen.util '
