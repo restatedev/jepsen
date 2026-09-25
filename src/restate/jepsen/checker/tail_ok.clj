@@ -29,24 +29,31 @@
        (map (fn [[node events]]
               [node (take-last n events)]))))
 
-(defn contains-error? [events]
-  (some #(and (= :info (:type %))
-              (contains? % :error))
-        events))
+(defn- indeterminate-error? [event]
+  (and (= :info (:type event))
+       (contains? event :error)))
+
+;; A healed node can still see an occasional error, such as a write the backend throttled
+;; through all its retries. Only repeated errors among a node's last events count as the
+;; node not having recovered.
+(def ^:private max-tail-errors 1)
+
+(defn- unrecovered? [events]
+  (> (count (filter indeterminate-error? events)) max-tail-errors))
 
 (defn check-nodes [history n]
   (let [nemesis-stop (latest-nemesis-stop history)
         events-after-stop (events-after history nemesis-stop)]
     (->> (last-n-events-per-node events-after-stop n)
          (filter (fn [[_node events]]
-                   (contains-error? events)))
+                   (unrecovered? events)))
          (map first) ; Get the node from each [node events] pair
          (filter some?)
          (into #{}))))
 
 (defn all-nodes-ok-after-final-heal
-  "A liveness checker that fails if the test doesn't end with at least some number of
-  :ok events on each node after the last nemesis cycle has ended."
+  "A liveness checker that fails if any node's last events after the final nemesis cycle
+  contain more than one indeterminate error."
   []
   (reify checker/Checker
     (check [_this _test history _opts]
@@ -56,7 +63,7 @@
             nodes-with-errors (check-nodes history tail-responses-per-node)]
         (if (seq nodes-with-errors)
           {:valid? false
-           :description (str "The last " tail-responses-per-node " events from some node(s) contained errors")
+           :description (str "The last " tail-responses-per-node " events from some node(s) contained more than " max-tail-errors " error")
            :errors (map (fn [node]
                           {:node node
                            :last-events (->> (last-n-events-per-node

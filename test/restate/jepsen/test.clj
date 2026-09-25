@@ -14,6 +14,7 @@
             [jepsen.checker :as checker]
             [jepsen.client :as client]
             [restate.jepsen.metadata-backend :as metadata-backend]
+            [restate.jepsen.checker.tail-ok :refer [all-nodes-ok-after-final-heal]]
             [restate.jepsen.set-metadata-store :as set-mds]))
 
 (deftest aws-creds-test
@@ -167,3 +168,19 @@
       (doall (pmap #(client/setup! (client/open! client {:nodes nodes} %) {:nodes nodes}) nodes)))
     (is (= 1 (count @writes)))
     (is (clojure.string/includes? (first @writes) "a.example"))))
+
+(deftest heal-checker-tolerates-one-error-per-node-test
+  (let [heal {:process :nemesis :type :info :f :stop}
+        op (fn [type & [error]] (cond-> {:process 0 :type type :f :add :node "n1"}
+                                  error (assoc :error error)))
+        valid? (fn [before-heal after-heal]
+                 (:valid? (checker/check (all-nodes-ok-after-final-heal) {}
+                                         (concat before-heal [heal] after-heal) {})))]
+    (testing "a single throttled write at the end of an otherwise healthy tail"
+      (is (true? (valid? [] (concat (repeat 5 (op :ok)) [(op :info :unhandled-exception)])))))
+    (testing "lost preconditions are definite failures, not errors"
+      (is (true? (valid? [] (repeat 5 (op :fail :precondition-failed))))))
+    (testing "repeated timeouts after the heal, even when the node answers again"
+      (is (false? (valid? [] (concat (repeat 3 (op :info :timeout)) [(op :ok)])))))
+    (testing "errors before the final heal do not count"
+      (is (true? (valid? (repeat 5 (op :info :timeout)) (repeat 5 (op :ok))))))))
