@@ -75,9 +75,11 @@
   (get-partition-processors-count "Follower.*Active"))
 
 (defn- partitions-ready-timeout
-  "Clusters with many partitions take longer to start all partition processors."
+  "Clusters with many partitions take longer to start all partition processors. Even small
+  ones can take well over a minute: auto-provisioning has been seen to finish 43 seconds after
+  startup, and a node that tried to join before then retries only every 30 seconds."
   [expected-count]
-  (max 60000 (* 1000 expected-count)))
+  (max 120000 (* 1000 expected-count)))
 
 (defn wait-for-partition-leaders [expected-count]
   (await-fn
