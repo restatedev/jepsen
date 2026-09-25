@@ -20,7 +20,8 @@
     [checker :as checker]
     [control :as c]
     [generator :as gen]
-    [nemesis :as nemesis]]))
+    [nemesis :as nemesis]]
+   [restate.util :as u]))
 
 (def ^:private verify-f :verify-metadata-backend)
 (def ^:private script-local-path "resources/verify-metadata.sh")
@@ -31,11 +32,13 @@
   [{:keys [store bucket table key]}]
   (case store
     :s3 (str "s3://" bucket "/" key)
+    :gcs (str "gs://" bucket "/" key)
     :dynamodb (str "dynamodb://" table "/" key)))
 
-(defn- script-args [{:keys [store bucket table key]}]
+(defn- script-args [{:keys [store bucket table key credentials-file]}]
   (case store
     :s3 [:s3 bucket key]
+    :gcs [:gcs bucket key (u/mounted-file-node-path credentials-file)]
     :dynamodb [:dynamodb table key]))
 
 (defn- lookup! [backend]

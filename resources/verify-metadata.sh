@@ -7,6 +7,7 @@
 # Usage:
 #   verify-metadata.sh s3 <bucket> <object-key>
 #   verify-metadata.sh dynamodb <table> <partition-key>
+#   verify-metadata.sh gcs <bucket> <object-name> <service-account-key-file>
 
 set -euo pipefail
 
@@ -23,6 +24,27 @@ aws_cli() {
   docker run --rm --network=host "${aws_cli_image}" --region "$(imds_region)" --output json "$@"
 }
 
+b64url() {
+  openssl base64 -A | tr '+/' '-_' | tr -d '='
+}
+
+# Tokens and signed assertions are passed to curl through process substitution with the
+# printf builtin, so they never appear in a process's arguments.
+gcs_access_token() {
+  local key_file=$1 now header claims signature
+  now=$(date +%s)
+  header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64url)
+  claims=$(jq -nc --arg iss "$(jq -r .client_email "${key_file}")" --argjson now "${now}" \
+    '{iss: $iss, scope: "https://www.googleapis.com/auth/devstorage.read_only",
+      aud: "https://oauth2.googleapis.com/token", iat: $now, exp: ($now + 300)}' | b64url)
+  signature=$(printf '%s.%s' "${header}" "${claims}" |
+    openssl dgst -sha256 -sign <(jq -r .private_key "${key_file}") | b64url)
+  curl -sSf https://oauth2.googleapis.com/token --data-binary @<(
+    printf 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=%s' \
+      "${header}.${claims}.${signature}"
+  ) | jq -er .access_token
+}
+
 store=$1
 shift
 case "${store}" in
@@ -33,6 +55,11 @@ case "${store}" in
     aws_cli dynamodb get-item --table-name "$1" --projection-expression pk \
       --key "$(jq -nc --arg pk "$2" '{pk: {S: $pk}}')" | jq -e .Item > /dev/null ||
       { echo "item ${2} not found in table ${1}" >&2; exit 1; }
+    ;;
+  gcs)
+    token=$(gcs_access_token "$3")
+    curl -sSf -o /dev/null -H @<(printf 'Authorization: Bearer %s' "${token}") \
+      "https://storage.googleapis.com/storage/v1/b/$1/o/$(jq -rn --arg name "$2" '$name | @uri')"
     ;;
   *)
     echo "unknown store: ${store}" >&2

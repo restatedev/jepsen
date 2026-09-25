@@ -9,8 +9,10 @@
 
 (ns restate.jepsen.test
   (:require [clojure.test :refer :all]
-            [restate.jepsen :refer [aws-creds get-env]]
+            [restate.jepsen :refer [restate-test]]
+            [restate.jepsen.common :refer [aws-creds get-env]]
             [jepsen.checker :as checker]
+            [jepsen.client :as client]
             [restate.jepsen.metadata-backend :as metadata-backend]
             [restate.jepsen.set-metadata-store :as set-mds]))
 
@@ -57,27 +59,31 @@
         (is (= "env-secret-key" (:secret-access-key result)))))))
 
 (deftest workload-gcs-validation-test
-  (testing "workload-gcs throws error when access-key-id is nil"
-    (is (thrown-with-msg? IllegalArgumentException
-                          #"Required parameter missing: :access-key-id"
-                          (set-mds/workload-gcs {:metadata-bucket "test-bucket"
-                                                 :unique-id "test-id"
-                                                 :access-key-id nil
-                                                 :secret-access-key "test-secret"}))))
+  (let [credentials-file (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit)]
+    (spit credentials-file "{}")
 
-  (testing "workload-gcs throws error when secret-access-key is nil"
-    (is (thrown-with-msg? IllegalArgumentException
-                          #"Required parameter missing: :secret-access-key"
-                          (set-mds/workload-gcs {:metadata-bucket "test-bucket"
-                                                 :unique-id "test-id"
-                                                 :access-key-id "test-key"
-                                                 :secret-access-key nil}))))
+    (testing "workload-gcs requires a bucket"
+      (is (thrown-with-msg? IllegalArgumentException
+                            #"Required parameter missing: :gcs-bucket"
+                            (set-mds/workload-gcs {:unique-id "test-id"
+                                                   :gcp-credentials-file (.getPath credentials-file)}))))
 
-  (testing "workload-gcs succeeds when all required parameters are provided"
-    (is (some? (set-mds/workload-gcs {:metadata-bucket "test-bucket"
-                                      :unique-id "test-id"
-                                      :access-key-id "test-key"
-                                      :secret-access-key "test-secret"})))))
+    (testing "workload-gcs requires a credentials file"
+      (is (thrown-with-msg? IllegalArgumentException
+                            #"Required parameter missing: :gcp-credentials-file"
+                            (set-mds/workload-gcs {:gcs-bucket "test-bucket"
+                                                   :unique-id "test-id"}))))
+
+    (testing "workload-gcs mounts the credentials file and points Restate at the bucket"
+      (let [workload-opts (:workload-opts (set-mds/workload-gcs {:gcs-bucket "test-bucket"
+                                                                 :unique-id "test-id"
+                                                                 :gcp-credentials-file (.getPath credentials-file)}))]
+        (is (= {(.getPath credentials-file) set-mds/gcp-credentials-mount-path}
+               (:mounted-files workload-opts)))
+        (is (= "gs://test-bucket/metadata-test-id"
+               (get-in workload-opts [:additional-env :RESTATE_METADATA_CLIENT__PATH])))
+        (is (= set-mds/gcp-credentials-mount-path
+               (get-in workload-opts [:additional-env :GOOGLE_APPLICATION_CREDENTIALS])))))))
 
 (defn- metadata-client-type
   "The metadata client type a workload configures, via its environment or its config file."
@@ -96,7 +102,10 @@
               :secret-access-key "test-secret"
               :s3-endpoint-url "http://minio:9000"}]
     (is (= "object-store" (metadata-client-type (set-mds/workload-s3 opts))))
-    (is (= "object-store" (metadata-client-type (set-mds/workload-gcs opts))))
+    (is (= "object-store" (metadata-client-type (set-mds/workload-gcs
+                                                  (assoc opts
+                                                         :gcs-bucket "test-bucket"
+                                                         :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit)))))))
     (is (= "object-store" (metadata-client-type (set-mds/workload-minio opts))))
     (is (= "dynamo-db" (metadata-client-type (set-mds/workload-ddb opts))))))
 
@@ -106,6 +115,12 @@
            (metadata-backend/location (:metadata-backend (set-mds/workload-s3 opts)))))
     (is (= "dynamodb://test-table/test-id_jepsen-set"
            (metadata-backend/location (:metadata-backend (set-mds/workload-ddb opts)))))
+    (is (= "gs://test-bucket/metadata-test-id/jepsen-set"
+           (metadata-backend/location
+            (:metadata-backend (set-mds/workload-gcs
+                                (assoc opts
+                                       :gcs-bucket "test-bucket"
+                                       :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit))))))))
     (is (nil? (:metadata-backend (set-mds/workload opts))))))
 
 (deftest metadata-backend-checker-test
@@ -121,3 +136,34 @@
              (check (concat client-ops [(verify-op nil) (verify-op {:found? false :error "404"})])))))
     (testing "fails when no lookup happened"
       (is (false? (:valid? (check client-ops)))))))
+
+(deftest workload-rate-cap-test
+  (let [opts {:nodes ["n1" "n2" "n3"] :concurrency 3 :time-limit 10 :dedicated-service-nodes 0
+              :num-partitions 1 :nemesis "none" :ssh {:dummy? true}}]
+    (testing "a workload's max-rate caps --rate"
+      (is (= set-mds/gcs-max-rate
+             (:rate (restate-test
+                     (assoc opts :workload "set-mds-gcs" :rate 100 :gcs-bucket "b"
+                            :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit))))))))
+    (testing "workloads without a cap keep --rate"
+      (is (= 100 (:rate (restate-test (assoc opts :workload "set-mds" :rate 100))))))
+    (testing "a lower --rate stays below the cap"
+      (is (= 1 (:rate (restate-test
+                       (assoc opts :workload "set-mds-gcs" :rate 1 :gcs-bucket "b"
+                              :gcp-credentials-file (.getPath (doto (java.io.File/createTempFile "gcp-credentials" ".json") .deleteOnExit))))))))))
+
+(deftest unique-run-ids-test
+  (let [opts {:nodes ["n1"] :concurrency 1 :rate 10 :time-limit 10 :dedicated-service-nodes 0
+              :num-partitions 1 :nemesis "none" :ssh {:dummy? true} :workload "set-mds"}]
+    (is (not= (:cluster-name (restate-test opts)) (:cluster-name (restate-test opts))))))
+
+(deftest set-metadata-store-setup-writes-once-test
+  (let [nodes ["a.example" "b.example" "c.example"]
+        writes (atom [])
+        client (:client (set-mds/workload {:unique-id "test-id"
+                                           :nodes nodes
+                                           :dedicated-service-nodes 0}))]
+    (with-redefs [hato.client/put (fn [url _] (swap! writes conj url))]
+      (doall (pmap #(client/setup! (client/open! client {:nodes nodes} %) {:nodes nodes}) nodes)))
+    (is (= 1 (count @writes)))
+    (is (clojure.string/includes? (first @writes) "a.example"))))

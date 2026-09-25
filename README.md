@@ -42,6 +42,15 @@ To tear down the cluster after you're done, use:
 just destroy-aws-cluster
 ```
 
+#### GCS bucket for the object-store metadata workload
+
+The `set-mds-gcs` workload needs a GCS bucket and a service account key. They live in the `restate-runtime-ci` GCP project and are managed by the Terraform module in [gcp](gcp), whose README covers setup and key rotation. To run the workload locally, mint a key into `gcp-credentials.json` and pass the bucket name:
+
+```shell
+just gcp-key-file
+just run-test set-mds-gcs partition-random-node ghcr.io/restatedev/restate:main restate-jepsen-tests-us-east4
+```
+
 ### Running tests
 
 To run a specific test against the AWS cluster:
@@ -81,12 +90,12 @@ After the initial run, you can omit the `--image-tarball` argument as the image 
 
 You can select the mode of operation via the `--workload` and `--nemesis` command line arguments.
 
-Two principal workloads are currently available:
+Two principal workloads are currently available, each with variants that exercise a different metadata store backend:
 
-- `set-mds` (requires `restate-server` compiled with `metadata-api` feature)
-- `set-vo` (requires the `Set` virtual object provided in this repository)
+- `set-mds` (requires `restate-server` compiled with `metadata-api` feature) against the embedded replicated metadata store; `set-mds-s3`, `set-mds-gcs` and `set-mds-minio` use the object-store backend with the respective store, and `set-mds-ddb` uses DynamoDB
+- `set-vo` (requires the `Set` virtual object provided in this repository); `set-vo-s3` additionally enables partition snapshots to S3
 
-These both validate linearizability based on the included Jepsen set-append checker. Fault injection strategies currently supported include:
+These all validate linearizability based on the included Jepsen set-append checker. Fault injection strategies currently supported include:
 
 - `none` (default)
 - `kill-random-node` (self-explanatory)

@@ -14,6 +14,9 @@ inputs:
   tableName:
     description: "DynamoDB table name for metadata - will be created on-demand if unset"
     required: false
+  instanceType:
+    description: "EC2 instance type for worker nodes; defaults to t3.small"
+    required: false
   workDir:
     description: "Test suite checkout location/Jepsen working directory"
     required: false
@@ -71,4 +74,4 @@ runs:
       working-directory: ./${{ inputs.workDir }}
       run: |
         SOURCE_IP=$(curl -s https://checkip.amazonaws.com)
-        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32" "${{ inputs.bucketName }}" "${{ inputs.tableName }}"
+        just create-aws-cluster "${{ inputs.clusterName }}" "${SOURCE_IP}/32" "${{ inputs.bucketName }}" "${{ inputs.tableName }}" "${{ inputs.instanceType }}"

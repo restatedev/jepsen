@@ -9,6 +9,7 @@
 
 (ns restate.jepsen
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :refer [info]]
    [jepsen
@@ -27,11 +28,13 @@
    [restate.jepsen.register-virtual-object :as register-vo]
    [restate.jepsen.set-metadata-store :as set-mds]
    [restate.jepsen.set-virtual-object :as set-vo]
-   [restate.util :as u]))
+   [restate.util :as u])
+  (:import
+   (java.nio.file Files)
+   (java.nio.file.attribute FileAttribute PosixFilePermissions)))
 
-(def restate-root "/opt/restate/")
-(def restate-config (str restate-root "config.toml"))
-(def restate-logfile (str restate-root "restate.log"))
+(def restate-config (str u/restate-root "config.toml"))
+(def restate-logfile (str u/restate-root "restate.log"))
 (def services-root "/opt/services/")
 (def services-args (str services-root "services.js"))
 (def services-pidfile (str services-root "services.pid"))
@@ -82,6 +85,34 @@
 (defn- get-node-name [nodes-list node]
   (str "n" (inc (.indexOf nodes-list node))))
 
+(defn- upload-private!
+  "Uploads a local file so that only root can read it on the node. Jepsen's scp preserves
+  the source file's mode, so the upload goes through a local copy that only we can read."
+  [local-path node-path]
+  (let [owner-only (PosixFilePermissions/asFileAttribute (PosixFilePermissions/fromString "rw-------"))
+        copy (Files/createTempFile "mounted-file" "" (into-array FileAttribute [owner-only]))]
+    (try
+      (io/copy (io/file local-path) (.toFile copy))
+      (c/upload (str copy) node-path)
+      (c/exec :chown "root:root" node-path)
+      (c/exec :chmod "600" node-path)
+      (finally
+        (Files/deleteIfExists copy)))))
+
+(defn- upload-mounted-files
+  "Uploads each local file in a {local-path container-path} map to the node and returns
+  the Docker --volume arguments that expose them read-only inside the container. Used for
+  credentials that must not appear in the container environment or the test map."
+  [mounted-files]
+  (when (seq mounted-files)
+    (c/exec :install :-d :-m "700" :-o "root" :-g "root" u/mounted-files-root))
+  (into []
+        (mapcat (fn [[local-path container-path]]
+                  (let [node-path (u/mounted-file-node-path local-path)]
+                    (upload-private! local-path node-path)
+                    ["--volume" (str node-path ":" container-path ":ro")])))
+        mounted-files))
+
 (defn restate
   "A deployment of Restate server."
   [opts]
@@ -92,9 +123,9 @@
         (info node "Setting up Restate on" (c/exec :hostname))
 
         (c/su
-         (c/exec :mkdir :-p (str restate-root "restate-data"))
-         (c/exec :chmod 777 restate-root)
-         (c/exec :ls :-l restate-root)
+         (c/exec :mkdir :-p (str u/restate-root "restate-data"))
+         (c/exec :chmod 777 u/restate-root)
+         (c/exec :ls :-l u/restate-root)
 
          (when (:image-tarball test)
            (info node "Uploading Docker image" (:image-tarball test) "to" node)
@@ -114,7 +145,8 @@
                                        (->> (u/restate-server-nodes opts)
                                             (map (fn [n] (str "http://" n ":5122")))
                                             (str/join ","))
-                                       "]")]
+                                       "]")
+               mounted-file-volumes (upload-mounted-files (:mounted-files test))]
            (c/exec
             :docker
             :run
@@ -130,6 +162,7 @@
             :--log-driver=k8s-file :--log-opt=max-size=10m :--log-opt=max-file=5
             :--volume (str restate-config ":/config.toml")
             :--volume "/opt/restate/restate-data:/restate-data"
+            mounted-file-volumes
             (docker-env (merge {:RESTATE_DEFAULT_NUM_PARTITIONS (:num-partitions opts)
                                 :RESTATE_METADATA_CLIENT__ADDRESSES metadata-addresses
                                 :RESTATE_ADVERTISED_ADDRESS (str "http://" node ":5122")
@@ -167,7 +200,7 @@
       (when (not (:dummy? (:ssh test)))
         (info node "Tearing down Restate on" (c/exec :hostname))
         (c/su
-         (c/exec :rm :-rf restate-root)
+         (c/exec :rm :-rf u/restate-root)
          (c/exec :docker :rm :-f "restate" :|| :true))))
 
     db/LogFiles
@@ -254,48 +287,36 @@
                             (fn stop [_t _n] [:no-op]))
    "partition-random-node" (nemesis/partition-random-node)})
 
-(defn get-env
-  "Wrapper for System/getenv to enable testing"
-  [var-name]
-  (System/getenv var-name))
-
-(defn aws-creds
-  "Get AWS credentials with precedence: CLI opts > environment variables
-
-   Precedence order:
-   1. CLI arguments: --access-key-id and --secret-access-key
-   2. Environment variables: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
-  [opts]
-  {:access-key-id (or (:access-key-id opts)
-                      (get-env "AWS_ACCESS_KEY_ID"))
-   :secret-access-key (or (:secret-access-key opts)
-                          (get-env "AWS_SECRET_ACCESS_KEY"))})
-
 (defn restate-test
   "Given an options map from the command line runner (e.g. :nodes, :ssh,
   :concurrency ...), constructs a test map. Special options:
 
-      :rate         Approximate number of requests per second, per thread
+      :rate         Approximate number of requests per second, across all clients;
+                    a workload's :max-rate caps it
       :ops-per-key  Maximum number of operations allowed on any given key.
       :workload     Type of workload.
       :nemesis      Nemesis to apply."
   [opts]
-  (let [unique-id (.format
-                   (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss")
-                   (java.util.Date.))
+  (let [;; Runs share external buckets and tables, so the id must not collide across runs
+        ;; that start in the same second.
+        unique-id (str (.format (java.text.SimpleDateFormat. "yyyyMMdd'T'HHmmss") (java.util.Date.))
+                       "-" (format "%06x" (rand-int 0x1000000)))
         workload ((get workloads (:workload opts)) (merge opts {:unique-id unique-id}))
+        rate (min (:rate opts) (:max-rate workload ##Inf))
+        _ (when (< rate (:rate opts))
+            (info "Workload" (:workload opts) "caps --rate" (:rate opts) "at" rate))
         backend (:metadata-backend workload)
         base-nemesis (get nemeses (:nemesis opts))
         workload-generator (if (or
                                 (= (:nemesis opts) "none")
                                 (nil? (:heal-time workload)))
                              (->> (:generator workload)
-                                  (gen/stagger (/ (:rate opts)))
+                                  (gen/stagger (/ rate))
                                   (gen/time-limit (:time-limit opts))
                                   (gen/clients))
                              (gen/phases
                               (->> (:generator workload)
-                                   (gen/stagger (/ (:rate opts)))
+                                   (gen/stagger (/ rate))
                                    (gen/nemesis (cycle [(gen/sleep 5) {:type :info, :f :start}
                                                         (gen/sleep 5) {:type :info, :f :stop}]))
                                    (gen/time-limit (:time-limit opts)))
@@ -303,15 +324,15 @@
                               (gen/once (gen/nemesis [{:type :info, :f :stop}]))
                               (gen/log "Running post-heal workload")
                               (->> (:generator workload)
-                                   (gen/stagger (/ (:rate opts)))
+                                   (gen/stagger (/ rate))
                                    (gen/time-limit (:heal-time workload)))))]
     (merge tests/noop-test
            opts
            {:restate-config-toml "restate-server.toml"}
            (:workload-opts workload)
            (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
-           (aws-creds opts)
            {:pure-generators true
+            :rate            rate
             :name            (str "restate-" (name (:workload opts)))
             :cluster-name    (str "jepsen-" unique-id)
             :db              (cluster-setup (restate opts) (app-server opts))
@@ -348,7 +369,9 @@
     :default "none"
     :validate (nemeses (cli/one-of nemeses))]
    [nil "--dynamodb-table NAME" "[Optional] DynamoDB table to use for dynamo-db metadata backend"]
-   [nil "--metadata-bucket NAME" "[Optional] Bucket to use for object-store metadata backend"]
+   [nil "--metadata-bucket NAME" "[Optional] S3 bucket to use for object-store metadata backend"]
+   [nil "--gcs-bucket NAME" "[Optional] GCS bucket to use for object-store metadata backend"]
+   [nil "--gcp-credentials-file PATH" "[Optional] GCP service account key (JSON) granting access to the GCS bucket"]
    [nil "--snapshot-bucket NAME" "[Optional] Bucket to use for partition snapshots"]
    [nil "--access-key-id ID" "[Optional] Explicit access key for object store access"]
    [nil "--secret-access-key SECRET" "[Optional] Explicit secret key for object store access"]
@@ -364,7 +387,7 @@
     :default  1
     :parse-fn read-string
     :validate [#(and (number? %) (pos? %)) "Must be a positive number"]]
-   ["-r" "--rate HZ" "Approximate number of requests per second, per thread."
+   ["-r" "--rate HZ" "Approximate number of requests per second, across all clients."
     :default  10
     :parse-fn read-string
     :validate [#(and (number? %) (pos? %)) "Must be a positive number"]]

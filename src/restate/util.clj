@@ -9,6 +9,7 @@
 
 (ns restate.util
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as s]
    [clojure.tools.logging :refer [info]]
    [jepsen
@@ -16,6 +17,17 @@
     [util :as util]]
    [jepsen-patched.util :refer [await-fn]]
    [clj-commons.slingshot :refer [throw+]]))
+
+(def restate-root "/opt/restate/")
+
+(def mounted-files-root
+  "Root-only directory on each node holding a workload's :mounted-files."
+  (str restate-root "mounted-files/"))
+
+(defn mounted-file-node-path
+  "Where a file from a workload's :mounted-files is uploaded to on each node."
+  [local-path]
+  (str mounted-files-root (.getName (io/file local-path))))
 
 (defn restate [cmd & args]
   (c/exec :docker :exec :restate :restate cmd args))
@@ -62,13 +74,19 @@
 (defn get-partition-processor-follower-count []
   (get-partition-processors-count "Follower.*Active"))
 
+(defn- partitions-ready-timeout
+  "Clusters with many partitions take longer to start all partition processors."
+  [expected-count]
+  (max 60000 (* 1000 expected-count)))
+
 (defn wait-for-partition-leaders [expected-count]
   (await-fn
    (fn [] (or (= (get-partition-processor-leader-count) expected-count)
               (throw+ {:type :restate-pp-not-ready})))
    {:status-fn (fn [_] (info "Waiting for" expected-count "leader partition processors:\n"
                              (restatectl :partitions :list :|| :true)))
-    :log-interval 5000}))
+    :log-interval 5000
+    :timeout (partitions-ready-timeout expected-count)}))
 
 (defn get-deployments-count []
   (-> (restate :sql :-q :--jsonl "select count(*) as count from sys_deployment" :| :jq ".count")
@@ -80,7 +98,8 @@
               (throw+ {:type :restate-pp-not-ready})))
    {:status-fn (fn [_] (info "Waiting for" expected-count "follower partition processors:\n"
                              (restatectl :partitions :list :|| :true)))
-    :log-interval 5000}))
+    :log-interval 5000
+    :timeout (partitions-ready-timeout expected-count)}))
 
 (defn await-url
   ([url]

@@ -14,6 +14,12 @@ inputs:
   clusterName:
     description: "Jepsen workers cluster AWS stack name"
     required: true
+  gcsBucket:
+    description: "GCS bucket for the set-mds-gcs workload; requires gcpCredentials"
+    required: false
+  gcpCredentials:
+    description: "GCP service account key (JSON) with object access to gcsBucket"
+    required: false
   testConfig:
     description: "Jepsen test run configuration"
     required: false
@@ -47,6 +53,8 @@ runs:
       id: jepsen-tests
       shell: bash
       working-directory: ./${{ inputs.workDir }}
+      env:
+        GCP_CREDENTIALS: ${{ inputs.gcpCredentials }}
       run: |
         set +e
 
@@ -58,6 +66,17 @@ runs:
         fi
         echo "Using Restate image: \`${JEPSEN_RESTATE_IMAGE}\`" >> $GITHUB_STEP_SUMMARY
         echo >> $GITHUB_STEP_SUMMARY
+
+        # The set-mds-gcs workload needs a GCS bucket and a service account key, which the test
+        # runner uploads to the worker nodes; the key never enters the Jepsen test map or logs.
+        GCS_ARGS=()
+        if [ -n "${GCP_CREDENTIALS}" ]; then
+          # mktemp creates the file readable by us only; RUNNER_TEMP is outside the uploaded store.
+          GCP_KEY_FILE=$(mktemp "${RUNNER_TEMP}/gcp-credentials.XXXXXX") || exit 1
+          trap 'rm -f "${GCP_KEY_FILE}"' EXIT
+          printf '%s' "${GCP_CREDENTIALS}" > "${GCP_KEY_FILE}" || exit 1
+          GCS_ARGS=(--gcs-bucket "${{ inputs.gcsBucket }}" --gcp-credentials-file "${GCP_KEY_FILE}")
+        fi
 
         echo "Checking for node connectivity..."
         CONNECTIVITY_MAX_RETRIES=5
@@ -119,6 +138,7 @@ runs:
                   echo "Retry attempt $RETRY_COUNT of $((MAX_RETRIES - 1)) for test $((COMPLETED_TESTS + 1))"
                 fi
 
+                CURRENT_BEFORE=$(readlink store/current 2>/dev/null)
                 lein run test \
                   --nodes-file aws/nodes.txt \
                   --username admin \
@@ -126,22 +146,37 @@ runs:
                   --dynamodb-table "$(jq -r 'keys[0] as $stack_name | .[$stack_name].DynamoDbMetadataTableName' aws/cdk-outputs.json)" \
                   --snapshot-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
                   --metadata-bucket "$(jq -r 'keys[0] as $stack_name | .[$stack_name].BucketName' aws/cdk-outputs.json)" \
+                  "${GCS_ARGS[@]}" \
                   --workload ${WORKLOAD} --nemesis ${NEMESIS} \
                   --image ${JEPSEN_RESTATE_IMAGE} \
                   --time-limit ${{ fromJSON(inputs.testConfig).duration || 30 }} \
                   --rate ${{ fromJSON(inputs.testConfig).rate || 10 }} \
                   --concurrency ${{ fromJSON(inputs.testConfig).concurrency || '5n' }} \
+                  --num-partitions ${{ fromJSON(inputs.testConfig).numPartitions || 1 }} \
                   --test-count 1 \
                   --leave-db-running ${{ inputs.retainCluster || 'false' }} \
                   | grep -Fv ' jepsen.util '
 
-                TEST_EXIT_CODE=$?
+                TEST_EXIT_CODE=${PIPESTATUS[0]}
 
-                # Check if this was an infrastructure failure we should retry
-                if [ $TEST_EXIT_CODE -ne 0 ] && [ -f store/latest/jepsen.log ]; then
-                  if grep -q "Test crashed!" store/latest/jepsen.log; then
+                # Jepsen points store/current at a run's directory once it starts logging, and
+                # store/latest only once the run gets far enough to save results. A run that never
+                # moved current, e.g. on invalid options, produced nothing to judge; otherwise judge
+                # this run's own log rather than whatever latest still points at.
+                RUN_DIR=$(readlink store/current 2>/dev/null)
+                if [ "${RUN_DIR}" = "${CURRENT_BEFORE}" ]; then
+                  echo "::error::Test $((COMPLETED_TESTS + 1)) for ${WORKLOAD}/${NEMESIS} exited with status ${TEST_EXIT_CODE} without producing results"
+                  SUCCESS=true
+                  GLOBAL_CONSECUTIVE_FAILURES=0
+                  OVERALL_STATUS=1
+                  continue
+                fi
+                RUN_LOG="store/${RUN_DIR}/jepsen.log"
+
+                if [ $TEST_EXIT_CODE -ne 0 ] && [ -f "${RUN_LOG}" ]; then
+                  if grep -q "Test crashed!" "${RUN_LOG}"; then
                     # Check for infrastructure failures (SCP, SSH, connection issues)
-                    if grep -E "(scp:|ssh:|Connection refused|Connection timed out|ConnectException|Shell command.*returned exit status)" store/latest/jepsen.log > /dev/null; then
+                    if grep -E "(scp:|ssh:|Connection refused|Connection timed out|ConnectException|Shell command.*returned exit status)" "${RUN_LOG}" > /dev/null; then
                       echo "::warning::Infrastructure failure detected on test $((COMPLETED_TESTS + 1)), retry $((RETRY_COUNT + 1))"
                       RETRY_COUNT=$((RETRY_COUNT + 1))
                       GLOBAL_CONSECUTIVE_FAILURES=$((GLOBAL_CONSECUTIVE_FAILURES + 1))
@@ -166,7 +201,7 @@ runs:
                     SUCCESS=true
                     GLOBAL_CONSECUTIVE_FAILURES=0
                     # Check for actual success vs failure
-                    if ! grep -q "Everything looks good" store/latest/jepsen.log 2>/dev/null; then
+                    if ! grep -q "Everything looks good" "${RUN_LOG}" 2>/dev/null; then
                       OVERALL_STATUS=1
                     fi
                   fi
@@ -174,7 +209,7 @@ runs:
                   # Test completed - check if it passed
                   SUCCESS=true
                   GLOBAL_CONSECUTIVE_FAILURES=0
-                  if [ -f store/latest/jepsen.log ] && ! grep -q "Everything looks good" store/latest/jepsen.log; then
+                  if [ -f "${RUN_LOG}" ] && ! grep -q "Everything looks good" "${RUN_LOG}"; then
                     OVERALL_STATUS=1
                   fi
                 fi
@@ -228,15 +263,15 @@ runs:
                 echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_TIMESTAMP} | ${INDIVIDUAL_STATUS} |" >> ${RESULTS_TABLE}
               done
             else
-              # Fallback to latest if no workload directory found
-              RUN_ID=$(readlink store/latest 2>/dev/null || echo "unknown")
-              echo "| ${WORKLOAD} | ${NEMESIS} | ${RUN_ID} | ${TEST_STATUS} |" >> ${RESULTS_TABLE}
+              # No run of this workload produced results
+              echo "| ${WORKLOAD} | ${NEMESIS} | none | ❌ |" >> ${RESULTS_TABLE}
+              OVERALL_STATUS=1
             fi
 
             # Create detailed results summary (using latest run)
             echo "<details><summary>Latest test details</summary><pre>" >> details-${WORKLOAD}-${NEMESIS}.md
-            if [ -f store/latest/jepsen.log ]; then
-              grep -A 50 -B 5 "Analysis complete\|Test crashed!\|Everything looks good\|Analysis invalid" store/latest/jepsen.log | tail -100 >> details-${WORKLOAD}-${NEMESIS}.md
+            if [ -f store/current/jepsen.log ]; then
+              grep -A 50 -B 5 "Analysis complete\|Test crashed!\|Everything looks good\|Analysis invalid" store/current/jepsen.log | tail -100 >> details-${WORKLOAD}-${NEMESIS}.md
             else
               echo "No jepsen.log file found" >> details-${WORKLOAD}-${NEMESIS}.md
             fi

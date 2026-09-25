@@ -15,6 +15,23 @@
   [s]
   (when s (parse-long s)))
 
+(defn get-env
+  "Wrapper for System/getenv to enable testing"
+  [var-name]
+  (System/getenv var-name))
+
+(defn aws-creds
+  "Static S3-compatible credentials for workloads that cannot use the worker nodes' instance
+  role, with precedence: --access-key-id/--secret-access-key CLI options, then the
+  AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables. Only call this from a
+  workload that needs them: the values end up in the test map, which Jepsen logs and
+  persists with the test results."
+  [opts]
+  {:access-key-id (or (:access-key-id opts)
+                      (get-env "AWS_ACCESS_KEY_ID"))
+   :secret-access-key (or (:secret-access-key opts)
+                          (get-env "AWS_SECRET_ACCESS_KEY"))})
+
 ;; Since client concurrency is bounded, we just apply a fairly dumb policy to paper over network failures
 (def max-retry-attemps 10)
 (def retry-delay-millis 50)
