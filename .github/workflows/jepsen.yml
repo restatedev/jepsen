@@ -1,5 +1,7 @@
 name: Run Restate Jepsen tests
 on:
+  schedule:
+    - cron: "0 0 * * *"
   push:
     branches: ["main"]
   pull_request:
@@ -90,7 +92,10 @@ jobs:
           # Bucket and key come from gcp/; see gcp/README.md
           gcsBucket: "restate-jepsen-tests-us-east4"
           gcpCredentials: ${{ secrets.GCP_CREDENTIALS }}
-          testConfig: ${{ inputs.testConfig || '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
+          testConfig: >-
+            ${{ inputs.testConfig ||
+                (github.event_name == 'schedule' && '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}') ||
+                '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
           retainCluster: ${{ inputs.retainCluster || '"false"' }}
 
       - uses: aws-actions/configure-aws-credentials@v4
