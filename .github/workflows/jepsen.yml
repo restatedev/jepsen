@@ -64,18 +64,18 @@ jobs:
       CLUSTER_NAME: ${{ inputs.clusterName || format('restatedev-jepsen-{0}', github.event.pull_request.number != null && format('pr-{0}-{1}', github.event.pull_request.number, github.run_id) || format('run-{0}', github.run_id)) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           repository: restatedev/jepsen
           sparse-checkout: |
             .github
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v4.3.1
         with:
           aws-region: us-east-1 # co-locate with WarpBuild worker
           role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
       - name: Setup Jepsen cluster ${{ env.CLUSTER_NAME }}
-        uses: ./.github/actions/setup
+        uses: $/.github/actions/setup
         with:
           ref: ${{ inputs.ref }}
           clusterName: ${{ env.CLUSTER_NAME }}
@@ -84,7 +84,7 @@ jobs:
           instanceType: ${{ inputs.instanceType }}
 
       - name: Run Jepsen tests
-        uses: ./.github/actions/run-tests
+        uses: $/.github/actions/run-tests
         with:
           restateImageId: ${{ inputs.restateImageId }}
           restatePr: ${{ inputs.restatePr }}
@@ -98,14 +98,14 @@ jobs:
                 '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
           retainCluster: ${{ inputs.retainCluster || '"false"' }}
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v4.3.1
         with:
           aws-region: us-east-1
           role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
         if: always()
 
       - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
-        uses: ./.github/actions/teardown
+        uses: $/.github/actions/teardown
         if: ${{ always() && !(inputs.retainCluster || false) }}
         with:
           clusterName: ${{ env.CLUSTER_NAME }}
