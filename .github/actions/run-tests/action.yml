@@ -39,7 +39,7 @@ runs:
   steps:
     - name: Download Restate Docker image
       if: inputs.restateCommit != '' || inputs.restatePr != ''
-      uses: dawidd6/action-download-artifact@v3
+      uses: dawidd6/action-download-artifact@v3.1.4
       with:
         repo: restatedev/restate
         workflow: ci.yml
@@ -300,7 +300,7 @@ runs:
 
     - name: Upload Jepsen output
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4.6.2
       with:
         name: jepsen-run-${{ github.run_id }}
         path: ./${{ inputs.workDir }}/store

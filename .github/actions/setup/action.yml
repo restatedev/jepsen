@@ -26,13 +26,13 @@ runs:
   using: "composite"
 
   steps:
-    - uses: extractions/setup-just@v2
+    - uses: extractions/setup-just@v2.0.0
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v4.4.0
       with:
         node-version: "22"
 
-    - uses: actions/setup-java@v4
+    - uses: actions/setup-java@v4.9.1
       with:
         distribution: "temurin"
         java-version: "21"
@@ -52,7 +52,7 @@ runs:
     #     fail-on-error: true
     #     wait-timeout-minutes: 10
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v4.4.0
       with:
         repository: restatedev/jepsen
         ref: ${{ inputs.ref }}
