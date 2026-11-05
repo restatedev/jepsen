@@ -64,12 +64,6 @@ jobs:
       CLUSTER_NAME: ${{ inputs.clusterName || format('restatedev-jepsen-{0}', github.event.pull_request.number != null && format('pr-{0}-{1}', github.event.pull_request.number, github.run_id) || format('run-{0}', github.run_id)) }}
 
     steps:
-      - uses: actions/checkout@v4.4.0
-        with:
-          repository: restatedev/jepsen
-          sparse-checkout: |
-            .github
-
       - uses: aws-actions/configure-aws-credentials@v4.3.1
         with:
           aws-region: us-east-1 # co-locate with WarpBuild worker
