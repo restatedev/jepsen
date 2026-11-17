@@ -22,8 +22,8 @@
     [tests :as tests]]
    [jepsen.checker.timeline :as timeline]
    [jepsen.control.util :as cu]
-   [jepsen.os.debian :as debian]
    [restate.jepsen.metadata-backend :as metadata-backend]
+   [restate.jepsen.os :as os]
    [restate.jepsen.register-metadata-store :as register-mds]
    [restate.jepsen.register-virtual-object :as register-vo]
    [restate.jepsen.set-metadata-store :as set-mds]
@@ -54,10 +54,6 @@
   (reify
     db/DB
     (setup! [_this test node]
-      (when (not (:dummy? (:ssh test)))
-        (c/su
-         (c/exec :apt :install :-y :podman :podman-docker :nodejs :jq)
-         (c/exec :touch "/etc/containers/nodocker")))
       (when (u/app-server-node? node test)
         (db/setup! app-server-setup test node))
       (when (u/restate-server-node? node test)
@@ -330,7 +326,7 @@
            opts
            {:restate-config-toml "restate-server.toml"}
            (:workload-opts workload)
-           (if (not (:dummy? (:ssh opts))) {:os debian/os} nil)
+           (if (not (:dummy? (:ssh opts))) {:os os/os} nil)
            {:pure-generators true
             :rate            rate
             :name            (str "restate-" (name (:workload opts)))

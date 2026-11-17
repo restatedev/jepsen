@@ -39,6 +39,7 @@ jobs:
           npm ci --prefix services
           npm run bundle --prefix services
           lein deps
+          lein test
       - name: Authenticate to the cluster broker
         id: acquire-auth
         uses: aws-actions/configure-aws-credentials@v4.3.1
