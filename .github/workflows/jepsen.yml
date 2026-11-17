@@ -56,11 +56,21 @@ jobs:
           AWS_SESSION_TOKEN: ${{ steps.acquire-auth.outputs.aws-session-token }}
         run: node --experimental-strip-types scripts/catalog.mts acquire
       - name: Run short Jepsen workloads
-        uses: $/.github/actions/run-tests
-        with:
-          workDir: .
-          clusterName: catalog
-          testConfig: '{"workloads":"set-vo set-mds-s3 set-mds-ddb","nemeses":"partition-random-node","duration":"30","rate":"10","concurrency":"5n","testCount":"1"}'
+        run: |
+          for workload in set-vo set-mds-s3 set-mds-ddb; do
+            rm -f store/current
+            lein run test \
+              --nodes-file aws/nodes.txt --username admin \
+              --ssh-private-key aws/private-key.pem \
+              --dynamodb-table "$(jq -r '.catalog.DynamoDbMetadataTableName' aws/cdk-outputs.json)" \
+              --snapshot-bucket "$(jq -r '.catalog.BucketName' aws/cdk-outputs.json)" \
+              --metadata-bucket "$(jq -r '.catalog.BucketName' aws/cdk-outputs.json)" \
+              --workload "$workload" --nemesis partition-random-node \
+              --image ghcr.io/restatedev/restate:main \
+              --time-limit 30 --rate 10 --concurrency 5n \
+              --num-partitions 1 --test-count 1 --leave-db-running false
+            grep -q 'Everything looks good' store/current/jepsen.log
+          done
       - name: Authenticate for cleanup
         if: ${{ always() && steps.cluster.outcome != 'skipped' && steps.acquire-auth.outcome == 'success' }}
         id: release-auth
@@ -81,3 +91,9 @@ jobs:
       - name: Remove local SSH key
         if: always()
         run: rm -f aws/private-key.pem aws/private-key.pem.pub
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: jepsen-smoke
+          path: store
