@@ -9,9 +9,7 @@ workflows:
         - 'actions/setup-node@v4.4.0'
         - 'actions/upload-artifact@v4.6.2'
         - 'aws-actions/configure-aws-credentials@v4.3.1'
-        - 'dawidd6/action-download-artifact@v3.1.4'
         - 'delaguardo/setup-clojure@13.0'
-        - 'extractions/setup-just@v2.0.0'
     '.github/workflows/pullfrog.yml':
         - 'actions/checkout@v6.1.0'
         - 'pullfrog/pullfrog@v0.1.110'
@@ -47,21 +45,11 @@ dependencies:
         commit: 'sha1-7474bc4690e29a8392af63c5b98e7449536d5c3a'
         owner_id: 57468012
         repo_id: 220391287
-    'dawidd6/action-download-artifact@v3.1.4':
-        ref: 'v3.1.4'
-        commit: 'sha1-09f2f74827fd3a8607589e5ad7f9398816f540fe'
-        owner_id: 9713907
-        repo_id: 239218448
     'delaguardo/setup-clojure@13.0':
         ref: '13.0'
         commit: 'sha1-94d767dbb80ae5c637d0f1ad70b75fa2b00495cd'
         owner_id: 542042
         repo_id: 203204970
-    'extractions/setup-just@v2.0.0':
-        ref: 'v2.0.0'
-        commit: 'sha1-dd310ad5a97d8e7b41793f8ef055398d51ad4de6'
-        owner_id: 64203070
-        repo_id: 258510356
     'pullfrog/pullfrog@v0.1.110':
         ref: 'v0.1.110'
         commit: 'sha1-895164fc90f5c493e72693c919c6cf269af158eb'

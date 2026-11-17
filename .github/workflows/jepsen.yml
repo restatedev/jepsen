@@ -1,106 +1,99 @@
 name: Run Restate Jepsen tests
 on:
-  # Restore nightly scheduling after secure cluster provisioning is in place.
-  push:
-    branches: ["main"]
-  pull_request:
+  # Restore automatic runs only after the broker integration is validated.
   workflow_dispatch:
-    inputs:
-      ref:
-        description: "Git ref for test suite"
-        required: false
-        default: "main"
-      restateCommit:
-        description: "Git commit id  (uses restatedev/restate Docker artifact)"
-        required: false
-        default: ""
-        type: string
-      restatePr:
-        description: "Test against PR Docker artifact (commit takes precedence)"
-        required: false
-        default: ""
-        type: string
-      restateImageId:
-        description: "Docker image (PR#/commit take precedence; defaults to ghcr.io/restatedev/restate:main)"
-        required: false
-        default: "ghcr.io/restatedev/restate:main"
-        type: string
-      testConfig:
-        description: "Test configuration parameters"
-        required: false
-        default: '{"workloads": "set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb", "nemeses": "partition-random-node", "duration": "60", "rate": "100", "concurrency": "5n", "testCount": "20"}'
-      clusterName:
-        description: "Jepsen workers cluster AWS stack name"
-        required: false
-        type: string
-      instanceType:
-        description: "EC2 instance type for worker nodes (default t3.small)"
-        required: false
-        type: string
-      retainCluster:
-        description: "Retain AWS cluster after Jepsen run"
-        default: false
-        required: false
-        type: boolean
 
 permissions:
-  id-token: write
   contents: read
 
-# A new push to a PR supersedes its in-progress run; cancelled runs still tear down their cluster.
 concurrency:
-  group: jepsen-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  group: jepsen-catalog-smoke
+  cancel-in-progress: false
 
 jobs:
   jepsen-tests:
-    if: >-
-      github.repository == 'restatedev/jepsen' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.repository == 'restatedev/jepsen' && github.ref == 'refs/heads/main'
     runs-on: warp-ubuntu-latest-x64-4x
-    env:
-      CLUSTER_NAME: ${{ inputs.clusterName || format('restatedev-jepsen-{0}', github.event.pull_request.number != null && format('pr-{0}-{1}', github.event.pull_request.number, github.run_id) || format('run-{0}', github.run_id)) }}
-
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: aws-actions/configure-aws-credentials@v4.3.1
+      - uses: actions/checkout@v4.4.0
         with:
-          aws-region: us-east-1 # co-locate with WarpBuild worker
-          role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
-      - name: Setup Jepsen cluster ${{ env.CLUSTER_NAME }}
-        uses: $/.github/actions/setup
+          persist-credentials: false
+      - uses: actions/setup-node@v4.4.0
         with:
-          ref: ${{ inputs.ref }}
-          clusterName: ${{ env.CLUSTER_NAME }}
-          bucketName: "restate-jepsen-tests-us-east-1"
-          tableName: "restate-jepsen-tests"
-          instanceType: ${{ inputs.instanceType }}
-
-      - name: Run Jepsen tests
-        uses: $/.github/actions/run-tests
+          node-version: '22'
+      - uses: actions/setup-java@v4.9.1
         with:
-          restateImageId: ${{ inputs.restateImageId }}
-          restatePr: ${{ inputs.restatePr }}
-          restateCommit: ${{ inputs.restateCommit }}
-          # Bucket and key come from gcp/; see gcp/README.md
-          gcsBucket: "restate-jepsen-tests-us-east4"
-          gcpCredentials: ${{ secrets.GCP_CREDENTIALS }}
-          testConfig: >-
-            ${{ inputs.testConfig ||
-                (github.event_name == 'schedule' && '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"20"}') ||
-                '{"workloads":"set-vo set-mds set-mds-s3 set-mds-gcs set-mds-ddb","nemeses":"partition-random-node","duration":"60","rate":"100","concurrency":"5n","testCount":"5"}' }}
-          retainCluster: ${{ inputs.retainCluster || '"false"' }}
-
-      - uses: aws-actions/configure-aws-credentials@v4.3.1
+          distribution: temurin
+          java-version: '21'
+      - uses: DeLaGuardo/setup-clojure@13.0
+        with:
+          lein: 2.11.2
+      - name: Build test services and fetch dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnuplot-nox
+          npm ci --prefix services
+          npm run bundle --prefix services
+          lein deps
+      - name: Authenticate to the cluster broker
+        id: acquire-auth
+        uses: aws-actions/configure-aws-credentials@v4.3.1
         with:
           aws-region: us-east-1
-          role-to-assume: "arn:aws:iam::307946634685:role/github-restatedev-jepsen-actions-role"
-        if: always()
-
-      - name: Tear down Jepsen cluster ${{ env.CLUSTER_NAME }}
-        uses: $/.github/actions/teardown
-        if: ${{ always() && !(inputs.retainCluster || false) }}
+          role-to-assume: arn:aws:iam::307946634685:role/JepsenCatalogPrototype-GitHubCaller7E649B28-Bnq25VpczSlg
+          role-session-name: jepsen-${{ github.run_id }}-${{ github.run_attempt }}
+          output-env-credentials: false
+          output-credentials: true
+      - name: Acquire bounded test cluster
+        id: cluster
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.acquire-auth.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.acquire-auth.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.acquire-auth.outputs.aws-session-token }}
+        run: node --experimental-strip-types scripts/catalog.mts acquire
+      - name: Run short Jepsen workloads
+        run: |
+          for workload in set-vo set-mds-s3 set-mds-ddb; do
+            rm -f store/current
+            lein run test \
+              --nodes-file aws/nodes.txt --username admin \
+              --ssh-private-key aws/private-key.pem \
+              --dynamodb-table "$(jq -r '.catalog.DynamoDbMetadataTableName' aws/cdk-outputs.json)" \
+              --snapshot-bucket "$(jq -r '.catalog.BucketName' aws/cdk-outputs.json)" \
+              --metadata-bucket "$(jq -r '.catalog.BucketName' aws/cdk-outputs.json)" \
+              --workload "$workload" --nemesis partition-random-node \
+              --image ghcr.io/restatedev/restate:main \
+              --time-limit 30 --rate 10 --concurrency 5n \
+              --num-partitions 1 --test-count 1 --leave-db-running false
+            grep -q 'Everything looks good' store/current/jepsen.log
+          done
+      - name: Authenticate for cleanup
+        if: ${{ always() && steps.cluster.outcome != 'skipped' && steps.acquire-auth.outcome == 'success' }}
+        id: release-auth
+        uses: aws-actions/configure-aws-credentials@v4.3.1
         with:
-          clusterName: ${{ env.CLUSTER_NAME }}
-          bucketName: "restate-jepsen-tests-us-east-1"
-          tableName: "restate-jepsen-tests"
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::307946634685:role/JepsenCatalogPrototype-GitHubCaller7E649B28-Bnq25VpczSlg
+          role-session-name: jepsen-${{ github.run_id }}-${{ github.run_attempt }}
+          output-env-credentials: false
+          output-credentials: true
+      - name: Release cluster and confirm deletion
+        if: ${{ always() && steps.release-auth.outcome == 'success' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.release-auth.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.release-auth.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.release-auth.outputs.aws-session-token }}
+        run: node --experimental-strip-types scripts/catalog.mts release
+      - name: Remove local SSH key
+        if: always()
+        run: rm -f aws/private-key.pem aws/private-key.pem.pub
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: jepsen-smoke
+          path: store
