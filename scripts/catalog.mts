@@ -27,11 +27,12 @@ async function invoke(action: string, parameters: Record<string, string> = {}): 
   const temporary = mkdtempSync(join(tmpdir(), 'jepsen-catalog-'));
   try {
     const output = join(temporary, 'response.json');
+    const payload = join(temporary, 'request.json');
+    writeFileSync(payload, JSON.stringify({ action, identityToken, ...parameters }), { mode: 0o600 });
     const metadata = JSON.parse(execFileSync('aws', [
       'lambda', 'invoke', '--region', 'us-east-1', '--function-name', broker,
-      '--cli-binary-format', 'raw-in-base64-out', '--payload', 'file:///dev/stdin', output,
+      '--cli-binary-format', 'raw-in-base64-out', '--payload', `file://${payload}`, output,
     ], {
-      input: JSON.stringify({ action, identityToken, ...parameters }),
       encoding: 'utf8', timeout: 60000, stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, AWS_PAGER: '', AWS_MAX_ATTEMPTS: '3' },
     }));
