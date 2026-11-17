@@ -1,7 +1,6 @@
 name: Run Restate Jepsen tests
 on:
-  schedule:
-    - cron: "0 0 * * *"
+  # Restore nightly scheduling after secure cluster provisioning is in place.
   push:
     branches: ["main"]
   pull_request:
