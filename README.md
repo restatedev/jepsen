@@ -18,6 +18,20 @@ To build Restate services or to create an AWS cluster, you will also need npm:
 just make-services
 ```
 
+### GitHub broker smoke run
+
+Run the manual workflow from `main`:
+
+```shell
+gh workflow run jepsen.yml -R restatedev/jepsen --ref main
+```
+
+It provisions three workers through the bounded Service Catalog broker, runs short
+`set-vo`, `set-mds-s3`, and `set-mds-ddb` workloads, then waits for cluster deletion.
+Only one cluster can be active. The broker expires leases after two hours if the
+runner disappears. Scheduled runs remain disabled. This workflow does not use the
+legacy CDK provisioning commands below or the GCP service-account key.
+
 ### Test infrastructure
 
 Jepsen assumes that you have a set of nodes accessible over SSH. These nodes are expected to run Debian Linux. If you already have root-level access to suitable nodes, you can specify them directly via the `--node` parameter below.
